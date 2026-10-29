@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Interactive Walls · ORE.XYZ</title>
+<style>
+  :root { --bg: #050608; --fg: #d9d6d0; --dim: #7d7a76; --line: #1c1d21; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 15px/1.5 ui-monospace, Menlo, Consolas, monospace; padding: max(32px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 40px max(20px, env(safe-area-inset-left)); }
+  main { max-width: 640px; margin: 0 auto; display: grid; gap: 28px; }
+  h1 { font-size: 15px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; margin: 0; }
+  p { margin: 0; color: var(--dim); }
+  ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+  li { border-bottom: 1px solid var(--line); }
+  a { display: grid; grid-template-columns: 3em 1fr; gap: 12px; padding: 16px 0; color: var(--fg); text-decoration: none; }
+  a:hover .t, a:focus-visible .t { text-decoration: underline; }
+  a:focus-visible { outline: 1px solid var(--fg); outline-offset: 4px; }
+  .n { color: var(--dim); font-variant-numeric: tabular-nums; }
+  .d { display: block; color: var(--dim); }
+  footer { color: var(--dim); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Interactive Walls</h1>
+  <p>Works for a wall, a screen or a projection that notice the people in front of them. Each runs in the browser; the camera image stays on your device.</p>
+  <ul>
+    <li><a href="iris/"><span class="n">01</span><span><span class="t">Iris</span><span class="d">Eyes in the dark that gather round you, turn and stare. Webcam, breath.</span></span></a></li>
+  </ul>
+  <footer>ORE.XYZ · Orestis Dimopoulos · <a style="display:inline;padding:0;color:inherit" href="https://orexyz.com">orexyz.com</a></footer>
+</main>
+</body>
+</html>
