@@ -27,7 +27,7 @@
 //   held almost still while they stare, back to a slow sleeping breath when you leave
 // Keys: F fullscreen (hides the cursor), S save a still, R new colours, V start/stop a video recording,
 //   D show what the camera sees (faces found, zoom area).
-// URL settings (for exhibiting, all optional): ?seed=123&eyes=20&most=120&minsize=100&size=260&max=30&dist=0.45&sleep=20&around=1&turn=45&tilt=25
+// URL settings (for exhibiting, all optional): ?seed=123&eyes=20&most=120&minsize=100&size=260&max=30&dist=0.45&sleep=20&around=1&turn=45&tilt=25&follow=0.55
 //   &space=1.7&sound=1&motion=0&blink=0&parallel=0.8&gain=1.6&layout=scatter&ripple=0.15&breath=1&quiet=1
 
 // Palettes measured from the five reference photos (colour values only; no image data is used).
@@ -74,6 +74,7 @@ const QUIET = opt('quiet', 1) > 0;      // with nobody there they look at each o
 const AROUND = opt('around', 1) > 0;   // someone there: each eye finds its own spot in loose rings around them (0 = they stay scattered)
 const TURN = opt('turn', 45) * Math.PI / 180;   // each whole eye turns in depth toward you, like a head turning (degrees, 0 = flat)
 const TILT = opt('tilt', 25) * Math.PI / 180;    // and spins it flat on the screen so its long axis points at you (degrees, 0 = level)
+const FOLLOW = opt('follow', 0.55);   // how much the whole eye turns along with its gaze (0 = only the iris moves, which reads as a fish)
 const AROUND_HOLE = 0.85;               // the first ring's distance from your face, in cells (your face stays clear)
 const VIGNETTE = 0.85;          // how dark the edges get (0 = none): the eyes come out of the dark
 const PARALLEL = opt('parallel', 0.8);   // 0 = each eye converges on you; 1 = all turn the same way (reads most clearly as "they follow me")
@@ -594,15 +595,25 @@ function drawFrame() {
       const dx = pf.x - e.x, dy = pf.y - e.y, d = sqrt(dx * dx + dy * dy) || 1, a = min(TURN, atan2(d, cell * 1.2)) * head;
       ux = dx / d * a; uy = dy / d * a;
     }
+    // and wherever it looks, the whole eye turns part of the way with it, like a face does: the iris stays nearer
+    // the middle of its opening instead of sliding to the corner of a flat, fixed socket
+    const gf = FOLLOW * (1 - e.sleep);
+    ux += e.gx * gf; uy += e.gy * gf;
+    const um = sqrt(ux * ux + uy * uy), ucap = max(TURN, 0.7);
+    if (um > ucap) { ux *= ucap / um; uy *= ucap / um; }
     e.t3x = lerp(e.t3x, ux, min(1, dt * 2.5)); e.t3y = lerp(e.t3y, uy, min(1, dt * 2.5));
     const turn = sqrt(e.t3x * e.t3x + e.t3y * e.t3y), tdir = atan2(e.t3y, e.t3x);
     const th = sqrt(e.gx * e.gx + e.gy * e.gy), dir = atan2(e.gy, e.gx) - e.rot, lphi = phi - e.rot;   // gaze and light in the eye's own (tilted) frame
-    const ri = bs * 0.45, rb = 2 * ri, off = 2 * ri * sin(th);
+    const ri = bs * 0.45, rb = 2 * ri, off = 2 * ri * sin(th) * (1 - 0.35 * gf);   // the turning eye carries part of the look
+    e.ix = off * cos(dir);                      // the lids' highest points follow the iris sideways
     const L = lids(e, rb, t);
     const ctx = drawingContext;
     if (L.shut > 0.97) return;                  // closed: nothing left in the dark
     ctx.save(); ctx.translate(e.x, e.y);
-    if (turn > 0.01) { ctx.rotate(tdir); ctx.scale(cos(turn), 1); ctx.rotate(-tdir); }
+    if (turn > 0.01) {   // turned: the opening slides a little toward where it faces (it sits on a ball) and its far side narrows
+      ctx.translate(cos(tdir) * sin(turn) * rb * 0.3, sin(tdir) * sin(turn) * rb * 0.3);
+      ctx.rotate(tdir); ctx.scale(cos(turn), 1); ctx.rotate(-tdir);
+    }
     ctx.rotate(e.rot); ctx.translate(-e.x, -e.y);
     ctx.save();
     lidPath(ctx, e.x, e.y, L); ctx.clip();      // everything of the eye is seen through the lid opening
@@ -822,12 +833,13 @@ function lids(e, rb, t) {
   const meet = lerp(up, lo, 0.75);
   up = lerp(up, meet, c); lo = lerp(lo, meet, c);
   // quadratic control points that make each curve pass through its apex
-  return { xl: e.x - rb * 0.98, xr: e.x + rb * 0.98, cu: 2 * up - e.y, cl: 2 * lo - e.y, open, shut: c };
+  const ix = e.ix || 0;
+  return { xl: e.x - rb * 0.98, xr: e.x + rb * 0.98, cu: 2 * up - e.y, cl: 2 * lo - e.y, ux: e.x + ix * 0.75, lx: e.x + ix * 0.45, open, shut: c };
 }
 
 function lidPath(ctx, cx, cy, L) {
   ctx.beginPath(); ctx.moveTo(L.xl, cy);
-  ctx.quadraticCurveTo(cx, L.cu, L.xr, cy); ctx.quadraticCurveTo(cx, L.cl, L.xl, cy);
+  ctx.quadraticCurveTo(L.ux, L.cu, L.xr, cy); ctx.quadraticCurveTo(L.lx, L.cl, L.xl, cy);
   ctx.closePath();
 }
 
