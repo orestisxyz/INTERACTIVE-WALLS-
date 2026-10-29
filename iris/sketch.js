@@ -27,7 +27,7 @@
 //   held almost still while they stare, back to a slow sleeping breath when you leave
 // Keys: F fullscreen (hides the cursor), S save a still, R new colours, V start/stop a video recording,
 //   D show what the camera sees (faces found, zoom area).
-// URL settings (for exhibiting, all optional): ?seed=123&size=260&max=30&dist=0.45&sleep=20&around=1&turn=30&tilt=15
+// URL settings (for exhibiting, all optional): ?seed=123&size=260&max=30&dist=0.45&sleep=20&around=1&turn=45&tilt=25
 //   &space=1.7&sound=1&motion=0&blink=0&parallel=0.8&gain=1.6&layout=scatter&ripple=0.15&breath=1&quiet=1
 
 // Palettes measured from the five reference photos (colour values only; no image data is used).
@@ -69,8 +69,8 @@ const WAKE_SPREAD = 1.6;        // seconds for the waking wave to cross the scre
 const BREATH = opt('breath', 1) > 0;    // a low breathing sound (starts after the first click, tap or key)
 const QUIET = opt('quiet', 1) > 0;      // with nobody there they look at each other, answer with a blink, and one sometimes stirs in its sleep
 const AROUND = opt('around', 1) > 0;   // someone there: each eye finds its own spot in loose rings around them (0 = they stay scattered)
-const TURN = opt('turn', 30) * Math.PI / 180;   // gathered round you, each whole eye turns in depth toward you, like a head turning (degrees, 0 = flat)
-const TILT = opt('tilt', 15) * Math.PI / 180;    // and spins it flat on the screen so its long axis points at you (degrees, 0 = level)
+const TURN = opt('turn', 45) * Math.PI / 180;   // each whole eye turns in depth toward you, like a head turning (degrees, 0 = flat)
+const TILT = opt('tilt', 25) * Math.PI / 180;    // and spins it flat on the screen so its long axis points at you (degrees, 0 = level)
 const AROUND_HOLE = 0.85;               // the first ring's distance from your face, in cells (your face stays clear)
 const VIGNETTE = 0.85;          // how dark the edges get (0 = none): the eyes come out of the dark
 const PARALLEL = opt('parallel', 0.8);   // 0 = each eye converges on you; 1 = all turn the same way (reads most clearly as "they follow me")
@@ -553,13 +553,14 @@ function drawFrame() {
     e.close = lerp(e.close, e.face >= 0 && faces[e.face] ? faces[e.face].close : 0, 0.03);
     // tilt: the eye's long axis turns toward the person it watches, so its look along it reads as a stare
     const pf = e.face >= 0 && faces[e.face];
+    const head = (1 - e.sleep) * lerp(0.75, 1, e.gath);   // every awake eye turns toward you like a head, gathered ones fully
     let rt = 0;
-    if (pf && TILT > 0) { let a = atan2(pf.y - e.y, pf.x - e.x); if (a > HALF_PI) a -= PI; else if (a < -HALF_PI) a += PI; rt = constrain(a, -TILT, TILT) * e.gath; }
+    if (pf && TILT > 0) { let a = atan2(pf.y - e.y, pf.x - e.x); if (a > HALF_PI) a -= PI; else if (a < -HALF_PI) a += PI; rt = constrain(a, -TILT, TILT) * head; }
     e.rot = lerp(e.rot, rt, min(1, dt * 2.5));
     // turn in depth: the eye turns toward you as if on a ball, so its far side narrows (an affine stand-in for 3D)
     let ux = 0, uy = 0;
     if (pf && TURN > 0) {
-      const dx = pf.x - e.x, dy = pf.y - e.y, d = sqrt(dx * dx + dy * dy) || 1, a = min(TURN, atan2(d, cell * 1.2)) * e.gath;
+      const dx = pf.x - e.x, dy = pf.y - e.y, d = sqrt(dx * dx + dy * dy) || 1, a = min(TURN, atan2(d, cell * 1.2)) * head;
       ux = dx / d * a; uy = dy / d * a;
     }
     e.t3x = lerp(e.t3x, ux, min(1, dt * 2.5)); e.t3y = lerp(e.t3y, uy, min(1, dt * 2.5));
