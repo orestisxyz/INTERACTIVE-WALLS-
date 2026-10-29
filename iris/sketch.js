@@ -27,7 +27,7 @@
 //   held almost still while they stare, back to a slow sleeping breath when you leave
 // Keys: F fullscreen (hides the cursor), S save a still, R new colours, V start/stop a video recording,
 //   D show what the camera sees (faces found, zoom area).
-// URL settings (for exhibiting, all optional): ?seed=123&size=260&max=30&dist=0.45&sleep=20&around=1&turn=45&tilt=25
+// URL settings (for exhibiting, all optional): ?seed=123&eyes=20&most=120&minsize=100&size=260&max=30&dist=0.45&sleep=20&around=1&turn=45&tilt=25
 //   &space=1.7&sound=1&motion=0&blink=0&parallel=0.8&gain=1.6&layout=scatter&ripple=0.15&breath=1&quiet=1
 
 // Palettes measured from the five reference photos (colour values only; no image data is used).
@@ -41,9 +41,12 @@ const PALETTES = [
 ];
 const Q = new URLSearchParams(location.search), opt = (k, d) => (Q.has(k) ? parseFloat(Q.get(k)) : d);
 const EYE_SIZE = opt('size', 260);   // wanted size of one eye's cell in px: the screen size decides how many eyes fit
-const MAX_EYES = opt('max', 30);     // upper limit for very big screens (each eye costs drawing time)
+const MAX_EYES = opt('max', 30);     // grid layout: upper limit for very big screens (each eye costs drawing time)
+const MOST_EYES = opt('most', 120);  // scattered: as many eyes as the device can draw smoothly, up to this many
+const MIN_CELL = opt('minsize', 100);   // ...and while each eye still gets at least this much room (px)
+const FIXED_EYES = Q.has('eyes') ? max(1, parseInt(Q.get('eyes'))) : 0;   // eyes=20: exactly this many, no adapting
 const SPACE = opt('space', 1.7);     // room around each eye: 1 = packed, 1.7 = about 9 eyes on a laptop, so the ring around you reads clearly
-let EYES = 0, cols = 1, rows = 1;   // set from the screen in layout()
+let EYES = 0, cols = 1, rows = 1, minEyes = 5, ceilEyes = 1e9, cellT = 100;   // set from the screen in layout()
 const STRUCTS = 2;              // distinct fibre structures shared (rotated) between the eyes
 const A = 512, R = 128;         // structure texture: angle samples x radial samples
 const SX = A / 1024;            // stroke sizes were designed at A = 1024
@@ -366,31 +369,58 @@ function colourise(e) {
   });
 }
 
-function layout() {
+// As many eyes as the device can draw: it starts at the count that suits the screen (or the count this
+// device managed last time), then adapt() adds eyes while drawing stays smooth and takes some away when it
+// doesn't. layout(n) re-places the crowd for n eyes: the eyes already there glide to their new places and
+// shrink slowly to the new size, new eyes open where they land. layout() starts afresh (new screen size).
+const ADAPT_EYES = LAYOUT !== 'grid' && !FIXED_EYES;
+const savedKey = () => 'iris-eyes-' + width + 'x' + height;
+const mostEyes = () => FIXED_EYES || max(minEyes, min(MOST_EYES, floor(width * height / (MIN_CELL * MIN_CELL * (PHONE ? 1 : SPACE)))));
+function layout(n) {
   [cols, rows] = gridFor(width, height);
-  const scatter = LAYOUT !== 'grid';
-  EYES = scatter ? max(PHONE ? 4 : 5, round(cols * rows / (PHONE ? 1 : SPACE))) : cols * rows;   // same eye size, fewer eyes (phones keep theirs: no room to spare)
+  const scatter = LAYOUT !== 'grid', first = !n || !eyes.length, prev = eyes.map((e) => [e.x, e.y]), had = eyes.length;
+  if (scatter) {
+    minEyes = max(PHONE ? 4 : 5, round(cols * rows / (PHONE ? 1 : SPACE)));   // the screen's own count: same eye size, fewer eyes
+    if (first) { let saved = 0; try { saved = parseInt(localStorage.getItem(savedKey())) || 0; } catch (e) { /* no storage */ } n = FIXED_EYES || saved; ceilEyes = 1e9; }
+    EYES = FIXED_EYES || constrain(n || minEyes, minEyes, mostEyes());
+    if (EYES > minEyes) { const cells = EYES * (PHONE ? 1 : SPACE); cols = max(1, round(sqrt(cells * width / height))); rows = max(1, ceil(cells / cols)); }
+  } else EYES = cols * rows;
   setEyeCount(EYES);
-  cell = min(width / cols, height / rows);
+  const cellWas = cell;
+  cell = cellT = min(width / cols, height / rows);
   eyes.forEach((e, i) => {
     const c = i % cols, r = floor(i / cols);
     e.x = width / 2 + (c - (cols - 1) / 2 + (scatter ? e.lx + (r % 2 ? 0.25 : -0.25) : 0)) * cell;   // rows offset like bricks
     e.y = height / 2 + (r - (rows - 1) / 2 + (scatter ? e.ly : 0)) * cell;
     e.s = scatter ? e.sc : 1;   // size of this eye
   });
-  if (scatter) { scatterEyes(); relax(); }
+  if (scatter) { scatterEyes(first ? 0 : min(had, EYES)); relax(); }   // a change of count: the eyes already there keep their places, new ones fill the gaps
   eyes.forEach((e) => { e.hx = e.x; e.hy = e.y; });   // home: where an eye drifts back to
   drawOrder = eyes.slice().sort((a, b) => a.s - b.s);   // bigger eyes in front
-  makeVignette();
-  makeTables(constrain(floor(cell * IRIS_IN_CELL / 0.9 * pixelDensity() * (scatter ? 1.15 : 1)), MIN_BUF, MAX_BUF));
-  eyes.forEach((e) => { if (!e.col.some((v) => v > 0)) colourise(e); });
+  const n2 = constrain(floor(cell * IRIS_IN_CELL / 0.9 * pixelDensity() * (scatter ? 1.15 : 1)), MIN_BUF, MAX_BUF);
+  if (first) {
+    makeVignette();
+    makeTables(n2);
+    eyes.forEach((e) => { if (!e.col.some((v) => v > 0)) colourise(e); });
+    return;
+  }
+  // a change of count: old eyes keep where they are (they glide home), new ones sleep until coloured, then open
+  cell = cellWas;
+  prev.forEach(([x, y], i) => { if (eyes[i]) { eyes[i].x = x; eyes[i].y = y; } });
+  if (abs(n2 - N) > N * 0.15) makeTables(n2);
+  eyes.slice(had).forEach((e) => {
+    e.sleep = 1; e.wakeAt = 1e12; e.ready = false;
+    if (!e.buf) { e.buf = createGraphics(N, N); e.buf.pixelDensity(1); e.buf.loadPixels(); e.buf.pixels.fill(0); }
+    jobs.push(() => { colourise(e); renderEye(e, millis() / 1000); e.ready = true; e.wakeAt = millis() + random(100, 900); });
+  });
 }
 
 // a loose crowd that still covers the screen evenly: each eye takes the best of 60 random spots, the one
 // furthest from the eyes already placed (best-candidate sampling; distance measured eye-shaped: wide, not tall)
-function scatterEyes() {
-  const placed = [];
-  eyes.forEach((e) => {
+function scatterEyes(keep) {
+  const placed = eyes.slice(0, keep).map((e) => ({ x: e.hx, y: e.hy }));
+  eyes.forEach((e, i) => {
+    if (i < keep) { e.x = e.hx; e.y = e.hy; return; }
     let best = null, bd = -1;
     range(60).forEach(() => {
       const x = random(0.04, 0.96) * width, y = random(0.06, 0.94) * height;
@@ -530,6 +560,7 @@ function drawFrame() {
     stirNext = t + random(12, 25);
   }
   drawOrder.forEach((e) => {
+    if (e.ready === false) return;   // a new eye still getting its colours
     const bs = bs0 * e.s;
     // nobody there for a while: each eye gets drowsy and closes, one after another; awake again at once
     // (when someone arrives, each eye waits for the waking wave to reach it)
@@ -616,6 +647,7 @@ function drawFrame() {
 
 // the eyes float a little in place and flinch away from a startle
 function creatureMoves(t, dt) {
+  cell = lerp(cell, cellT, min(1, dt * 1.2));   // after a change of count the eyes grow or shrink slowly
   if (AROUND && faces.length && millis() > slotsAt) { assignSlots(); slotsAt = millis() + 400; }
   eyes.forEach((e) => {
     const p = e.face >= 0 && faces[e.face], here = p && e.has && e.sleep < 0.5 && AROUND;
@@ -1127,6 +1159,13 @@ function track() {
   remember(focus, now); faces.forEach((p) => remember(p, now));
 }
 
+function setEyes(n) {
+  layout(n);
+  lastAdapt = millis() + 2000;   // let the new eyes settle before measuring again
+  try { localStorage.setItem(savedKey(), EYES); } catch (e) { /* remembered for this visit only */ }
+  console.log(EYES + ' eyes');
+}
+
 function adapt() {
   fpsAvg = lerp(fpsAvg, frameRate(), 0.05);
   // all asleep: run slowly (saves battery and heat in an installation); awake again at the normal rate
@@ -1139,7 +1178,14 @@ function adapt() {
     // (it must be slow twice in a row, so a hiccup while the face model loads doesn't count, and it tries 60 again
     // after a while if the machine was only busy; after two drops it stays at 30)
     lowCount = fpsTarget === 60 && fpsAvg < 45 ? lowCount + 1 : 0;
-    if (lowCount >= 2) { fpsTarget = curRate = 30; frameRate(30); fpsAvg = 30; lowCount = 0; drops++; droppedAt = millis(); }
+    const awakeN = eyes.filter((e) => e.sleep < 0.5).length;
+    if (lowCount >= 2 && ADAPT_EYES && EYES > minEyes) {   // too many: a fifth fewer (far too many: 40% fewer), and never this many again here
+      ceilEyes = EYES - 1; lowCount = 0;
+      setEyes(floor(EYES * (fpsAvg < 30 ? 0.6 : 0.8)));
+    } else if (lowCount >= 2) { fpsTarget = curRate = 30; frameRate(30); fpsAvg = 30; lowCount = 0; drops++; droppedAt = millis(); }
+    else if (ADAPT_EYES && fpsTarget === 60 && fpsAvg > 56 && drawMs < 9 && awakeN > EYES * 0.7 && EYES < min(ceilEyes, mostEyes())) {
+      setEyes(min(ceilEyes, EYES + max(2, round(EYES * 0.25))));   // smooth with most eyes open: a quarter more
+    }
     else if (fpsTarget === 30 && drops < 2 && millis() - droppedAt > 15000 && drawMs < 8) { fpsTarget = curRate = 60; frameRate(60); fpsAvg = 60; }
     else if (fpsAvg < 25 && N > MIN_BUF) makeTables(max(MIN_BUF, floor(N * 0.85)));
   }
