@@ -606,6 +606,7 @@ function drawFrame() {
   });
   if (vig && recorder) drawingContext.drawImage(vig.elt, 0, 0, width, height);   // videos include the vignette
   if (showCam) camView();
+  runCalib();
   breathe(dt);
   adapt();
 }
@@ -994,9 +995,54 @@ function listen() {
   } else mic.base = lerp(mic.base, rms, 0.02);
 }
 
-// camera position (0..1) to screen: mirrored (you on the right of the camera = right of the screen), widened by GAIN
-const toScreenX = (fx) => width / 2 + (0.5 - fx) * width * GAIN;
-const toScreenY = (fy) => height / 2 + (fy - 0.45) * height * GAIN;
+// camera position (0..1) to screen: mirrored (you on the right of the camera = right of the screen), widened by GAIN.
+// After a calibration (C key) the middle of the room is the middle of the screen and its sides are near the edges.
+const toScreenX = (fx) => calib ? width / 2 + (calib.cx - fx) / calib.half * width * 0.45 : width / 2 + (0.5 - fx) * width * GAIN;
+const toScreenY = (fy) => height / 2 + (fy - (calib ? calib.cy : 0.45)) * height * GAIN;
+
+// ---------- calibration (C key) ----------
+// For a wall, a projector or a camera off to one side: stand in the middle, then at one side, then the other.
+// Each step waits a few seconds and takes where the camera sees you. Saved in this browser; ?calib=0 forgets it.
+let calib = loadCalib(), calibRun = null;
+function loadCalib() {
+  try {
+    if (Q.get('calib') === '0') { localStorage.removeItem('iris-calib'); return null; }
+    const c = JSON.parse(localStorage.getItem('iris-calib'));
+    return c && c.half > 0.02 ? c : null;
+  } catch (e) { return null; }
+}
+const CALIB_STEPS = ['Stand in the middle, facing the screen', 'Now go to one side of where people will stand', 'Now go to the other side'];
+function startCalib() {
+  if (calibRun) { calibRun = null; showCam = false; return; }   // C again: cancel, keep the old one
+  calibRun = { step: 0, at: millis() + 4000, got: [] };
+  showCam = true;
+}
+function runCalib() {
+  if (!calibRun) return;
+  const now = millis(), left = ceil((calibRun.at - now) / 1000), f = faces[0];
+  if (now >= calibRun.at) {
+    if (f && now - f.lastSeen < 300) {
+      calibRun.got.push({ x: f.fx.x(), y: f.fy.x() });
+      calibRun.step++;
+      calibRun.at = now + 5000;
+    } else calibRun.at = now + 2000;   // nobody seen: wait and try again
+  }
+  if (calibRun.step === 3) {
+    const [m, a, b] = calibRun.got, half = (abs(a.x - m.x) + abs(b.x - m.x)) / 2;
+    if (half > 0.02) {
+      calib = { cx: m.x, cy: m.y, half };
+      try { localStorage.setItem('iris-calib', JSON.stringify(calib)); } catch (e) { /* kept for this visit only */ }
+    }
+    calibRun = null; showCam = false;
+    return;
+  }
+  noStroke(); fill(BG[0], BG[1], BG[2], 210); rect(0, height / 2 - 60, width, 110);   // a dark band so the words read over the eyes
+  fill(230); textAlign(CENTER, CENTER); textSize(max(16, width / 50));
+  text(CALIB_STEPS[calibRun.step], width / 2, height / 2 - 20);
+  textSize(max(12, width / 80)); fill(150);
+  text(f ? (left > 0 ? left : 'hold still') : 'looking for you…', width / 2, height / 2 + 20);
+  textAlign(LEFT, BASELINE);
+}
 
 // One Euro filter (Casiez, Roussel & Vogel, CHI 2012): smooths jitter when you are still, but follows fast moves
 // without lag; it also gives a speed, used to predict where you are between camera checks
@@ -1112,6 +1158,7 @@ function keyPressed() {
   if (k === 'r') recolour();
   if (k === 'v') toggleRecording();
   if (k === 'd') showCam = !showCam;
+  if (k === 'c') startCalib();
 }
 // double-tap (phone) or double-click: show or hide the camera view, like the D key
 let lastTap = -1e9;

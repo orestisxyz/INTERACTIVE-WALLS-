@@ -13,7 +13,8 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 - **Camera:** finds faces with MediaPipe (BlazeFace), on your device. No image leaves the browser; nothing is recorded or sent.
 - **Microphone:** only listens for loud sounds, which startle the eyes.
 - **Sound:** a breathing sound, which starts after the first click, tap or key.
-- **Keys:** F fullscreen, S save a still, R new colours, V record a video, D show what the camera sees.
+- **Keys:** F fullscreen, S save a still, R new colours, V record a video, D show what the camera sees, C calibrate.
+- **Calibrate for a wall:** if the camera is off to one side or far from the screen, press C and follow the words: stand in the middle, then at one side, then the other (a few seconds each). It is saved in that browser. Add `?calib=0` to the address to forget it.
 - **Settings in the address**, for example `iris/?space=1.7&turn=30&tilt=15&sleep=20`: `space` (fewer eyes when higher), `around` (0 = they stay scattered), `turn` and `tilt` (degrees), `sleep` (seconds before they fall asleep), `sound` (0 = no microphone), `seed` (same layout and colours every time). The top of `iris/sketch.js` lists the rest.
 - **Needs:** https or localhost for the camera; an internet connection on first load (p5.js and the face model come from CDNs).
 
