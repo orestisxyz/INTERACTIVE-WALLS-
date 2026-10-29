@@ -87,7 +87,6 @@ const TYPES = {
   sleepy: { speed: 0.32, lid: 0.82, blink: [4, 9], dur: 0.34 },
   blinky: { speed: 0.4, lid: 0.92, blink: [1.5, 4], dur: 0.2 },
 };
-const WHITE = opt('white', 1);   // 1 = whole eyes; 0 = no white, the iris seen through the eye's opening; -1 = only round irises, floating
 const VEINS = 1;                // redness of the whites (0 = none)
 const SLEEP_AFTER = opt('sleep', 20);    // seconds with nobody there before the eyes start falling asleep
 const STARTLE_SOUND = opt('sound', 1) > 0;   // loud sounds startle the eyes (asks for the microphone)
@@ -606,17 +605,14 @@ function drawFrame() {
     if (turn > 0.01) { ctx.rotate(tdir); ctx.scale(cos(turn), 1); ctx.rotate(-tdir); }
     ctx.rotate(e.rot); ctx.translate(-e.x, -e.y);
     ctx.save();
-    if (WHITE < 0) {   // only the iris: it squeezes shut when the eye blinks or sleeps
-      ctx.translate(e.x, e.y); ctx.scale(1, max(0.02, 1 - L.shut)); ctx.translate(-e.x, -e.y);
-    } else lidPath(ctx, e.x, e.y, L), ctx.clip();      // everything of the eye is seen through the lid opening
-    if (WHITE > 0) sclera(e.x, e.y, rb, lphi);
-    if (WHITE > 0 && VEINS > 0) { if (!e.veins) e.veins = makeVeins(e); ctx.globalAlpha = VEINS; ctx.drawImage(e.veins.elt, e.x - rb, e.y - rb, 2 * rb, 2 * rb); ctx.globalAlpha = 1; }
+    lidPath(ctx, e.x, e.y, L); ctx.clip();      // everything of the eye is seen through the lid opening
+    sclera(e.x, e.y, rb, lphi);
+    if (VEINS > 0) { if (!e.veins) e.veins = makeVeins(e); ctx.globalAlpha = VEINS; ctx.drawImage(e.veins.elt, e.x - rb, e.y - rb, 2 * rb, 2 * rb); ctx.globalAlpha = 1; }
     ctx.save();   // canvas calls, not p5 push/pop: p5 2.x pop() would undo the eye's tilt
     ctx.translate(e.x + off * cos(dir), e.y + off * sin(dir));
     ctx.rotate(dir); ctx.scale(cos(th), 1); ctx.rotate(-dir);
     ctx.drawImage(e.buf.elt, -bs / 2, -bs / 2, bs, bs);
     ctx.restore();
-    if (WHITE <= 0) { catchlight(e.x + 0.35 * off * cos(dir), e.y + 0.35 * off * sin(dir), ri, lphi); ctx.restore(); ctx.restore(); return; }
     // soft shading where the lids meet the eyeball: an elliptical gradient that darkens toward the lid edges
     // and into the corners, plus the shadow the upper lid casts downward
     const yu = (L.cu + e.y) / 2, yl = (L.cl + e.y) / 2, ry = max(1, (yl - yu) / 2), ym = (yu + yl) / 2;
