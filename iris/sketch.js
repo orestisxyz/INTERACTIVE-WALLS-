@@ -1,34 +1,36 @@
-// Iris grid — ORE.XYZ MAKE #07b. A grid of generative eyes, each in its own natural colour,
-// all turning to look at the centre of your face (webcam + MediaPipe BlazeFace, runs locally).
-// Part of Interactive Walls (github.com/orestisxyz/INTERACTIVE-WALLS-).
-// How it works:
-// - An iris "structure" is painted once into an unwrapped strip (x = angle, y = pupil edge -> limbus)
-//   in neutral grey: fibres, crypts, collarette, furrows. Its brightness becomes a relief map (normals).
-// - Each eye takes one of the structures, rotated by a random angle, and recolours it with its own
-//   natural palette, bred from the 5 measured from the reference photos; the most different of
-//   many candidates are kept, so every eye is a different colour.
-// - The screen decides how many eyes: cells of about EYE_SIZE px fill it (a phone gets a few big eyes,
-//   a large monitor many); resizing the window adds or removes eyes.
-// - Gaze: your face is treated as a point in front of the screen (closer face = nearer point), and
-//   every eyeball rotates toward it, so the eyes converge on you. With several people, each eye picks one.
-// - Each eye has its own blink rhythm and lid shape, eyelids that follow its gaze and blink,
-//   a pupil that narrows when you come close or the room is bright, and veins in the white.
-// - BLINK_BACK: a heavier face model also reads your eyelids, and the eyes watching you blink back.
-// Performance (§16.8): all heavy loops use forEach (p5 editor loop protection); each eye's image is
-// re-rendered only every few frames (round robin) while the turning is a cheap affine transform drawn
-// every frame; buffers shrink if fps falls. Works with p5.js 1.x and 2.x.
-// Behaviour, kept simple so every reaction has a clear cause:
-// - you are there: the scattered eyes gather around you and follow you as you move, and every eye looks at you (with several people, each eye picks one; a newcomer gets a look from all)
-// - you come closer: the pupils narrow
-// - you leave: they look at each other and drift, then fall asleep one by one (one stirs now and then)
-// - you arrive: they wake in a wave, nearest first
-// - a loud sound: they snap toward it and flinch away (sudden movement too, if motion=1)
-// - it breathes (a low sound, starts after the first click or tap): closer and warmer as they gather round you,
-//   held almost still while they stare, back to a slow sleeping breath when you leave
-// Keys: F fullscreen (hides the cursor), S save a still, R new colours, V start/stop a video recording,
-//   D show what the camera sees (faces found, zoom area).
-// URL settings (for exhibiting, all optional): ?seed=123&eyes=20&most=120&minsize=100&size=260&max=30&dist=0.45&sleep=20&around=1&turn=45&tilt=25&follow=0.55&story=1&calm=12&grow=0.8&trust=0
-//   &space=1.7&sound=1&motion=0&blink=0&parallel=0.8&gain=1.6&layout=scatter&ripple=0.15&breath=1&quiet=1
+// Iris — ORE.XYZ MAKE #07. Part of Interactive Walls (github.com/orestisxyz/INTERACTIVE-WALLS-).
+// A shy beast made of eyes in the dark. It watches you through the webcam (MediaPipe face detection, on this
+// device only: nothing is recorded, sent or recognised) and listens through the microphone.
+//
+// The story (story=1):
+// 1 arrive: the eyes run from you to the edges, look away and steal glances; moving or noise makes it worse
+// 2 stand still and quiet: trust builds over `calm` seconds; moving (`lose`) and noise (`hush`) take it away,
+//   a rush, a bang or a clap frightens it (the eyes shut and flinch). The bravest eyes come closer first
+// 3 the pact: at full trust every eye shuts, then opens wide, nearest first, with one deep breath
+// 4 companion: it follows you; stop, and it gathers round you and grows; a sound and it keeps watch for you
+// 5 a stranger comes: it guards you until they have stayed calm for `accept` seconds
+// 6 you leave: it watches the side you left by and lets out one long breath. Come back the same way within
+//   `remember` seconds and it greets you; anyone else starts the story afresh
+// Around it: each eye is a "lost soul" that lives a while (`life` seconds), fades, and is born again elsewhere;
+// the day's mood (frights make it shyer for the next visitors, friends make it bolder); a narrator line at the
+// bottom says what is happening and what to do (`words`, `lang=el` for Greek).
+//
+// How it is drawn: an iris structure is painted once into an unwrapped strip and each eye recolours it with its
+// own natural palette (measured from reference photos). Each eye's iris image is re-rendered a few times a
+// second, round robin; the turning and lids are cheap canvas transforms drawn every frame. The eye count adapts
+// to the device (more while it stays smooth, fewer when it stutters). All heavy loops use forEach, so it runs in
+// the p5 web editor (loop protection), with p5.js 1.x and 2.x.
+//
+// Keys: F fullscreen, S save a still, R new colours, V start/stop a video, D what the camera sees (faces, trust,
+//   fps, mood), C calibrate for a wall (stand in the middle, then each side).
+// Installation: kiosk/start_iris.bat and kiosk/SETUP_WINDOWS.md. sw.js keeps a copy of everything in the
+//   browser, so it starts without internet after the first time.
+// URL settings (all optional), story: calm=16 lose=3 hush=3 shy=1 snap=1.4 tempo=0.6 grow=0.8 trust=0 pact=1
+//   accept=8 remember=30 mood=1 words=1 lang=en
+// eyes: most=24 eyes=N (fixed) minsize=100 size=260 space=1.7 life=60-360 seed=N layout=scatter|grid
+// look: turn=45 tilt=25 follow=0.55 parallel=0.8 gain=1.6 dist=0.45 ripple=0.15 around=1
+// room: sound=1 rhythm=1 motion=0 blink=0 breath=1 quiet=1 sleep=20 gpu=0
+// installation: kiosk=0 reload=4 dpr=2 offline=1 calib=0 (forgets the calibration)
 
 // Palettes measured from the five reference photos (colour values only; no image data is used).
 // ramp = median colour in 8 rings from pupil edge (0) to limbus (7); fibre = brightest 15% of the mid-iris.
@@ -42,7 +44,12 @@ const PALETTES = [
 const Q = new URLSearchParams(location.search), opt = (k, d) => (Q.has(k) ? parseFloat(Q.get(k)) : d);
 const EYE_SIZE = opt('size', 260);   // wanted size of one eye's cell in px: the screen size decides how many eyes fit
 const MAX_EYES = opt('max', 30);     // grid layout: upper limit for very big screens (each eye costs drawing time)
-const MOST_EYES = opt('most', 120);  // scattered: as many eyes as the device can draw smoothly, up to this many
+const MOST_EYES = opt('most', 24);   // scattered: as many eyes as the device can draw smoothly, up to this many (24: lost souls)
+// life cycle: each eye lives a while (seconds, random between the two), then closes and fades into the dark and
+// a new one is born somewhere else, so the count stays the same. Eyes close round a visitor, or guarding them,
+// never die then (they age 5x slower); the rest of the ring ages a little slower. life=0: they live for ever
+const LIFE = (Q.get('life') || '60-360').split('-').map(Number), LIVES = LIFE[0] > 0;
+const DIE_S = 6, BORN_S = 4;   // seconds to fade out, and to fade in
 const MIN_CELL = opt('minsize', 100);   // ...and while each eye still gets at least this much room (px)
 const FIXED_EYES = Q.has('eyes') ? Math.max(1, parseInt(Q.get('eyes'))) : 0;   // eyes=20: exactly this many, no adapting
 const SPACE = opt('space', 1.7);     // room around each eye: 1 = packed, 1.7 = about 9 eyes on a laptop, so the ring around you reads clearly
@@ -63,8 +70,15 @@ const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite';
 const DELEGATE = opt('gpu', 0) > 0 ? 'GPU' : 'CPU';   // face search on the CPU (safe; phones always try the GPU first) or set gpu=1 to try the GPU
 const STORY = opt('story', 1) > 0;   // the beast: scared at first, it trusts only someone who stays still; then it follows, and grows round you when you stop (0 = it simply follows)
-const CALM = opt('calm', 12);        // seconds of standing still before it trusts you fully
+const SHY = opt('shy', 1);           // how strongly it keeps away and trembles while afraid (0 = not at all)
+const TEMPO = opt('tempo', 0.6);     // speed of the eyes' own small acts: darting looks, peeks, trembling (1 = the old quick pace)
+const SNAP = opt('snap', 1.4);       // how snappily they come to you and run from you (1 = the old pace)
+const LOSE = opt('lose', 3);         // until it trusts you fully, moving loses trust this many times faster than standing still earns it
+const HUSH = opt('hush', 3);         // the same for sound: noise loses trust this many times faster than quiet stillness earns it
+const CALM = opt('calm', 16);        // seconds of standing still before it trusts you fully
 const GROW = opt('grow', 0.8);       // how much bigger the eyes get round you when you stop (0.8 = up to 1.8x)
+const ACCEPT = opt('accept', 8);        // seconds a stranger must stay calm before it accepts them (people who come with you are accepted at once)
+const REMEMBER = opt('remember', 30);    // seconds it remembers you after you leave: come back in time and it greets you
 const BLINK_BACK = opt('blink', 0) > 0;   // 1 = face-landmark model, about 4x heavier (graphics chip first): the eyes blink back, and a slow blink earns extra trust
 const LMODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 const MAX_FACES = 3;            // people the eyes can share their attention between
@@ -94,16 +108,21 @@ const TYPES = {
 const VEINS = 1;                // redness of the whites (0 = none)
 const SLEEP_AFTER = opt('sleep', 20);    // seconds with nobody there before the eyes start falling asleep
 const STARTLE_SOUND = opt('sound', 1) > 0;   // loud sounds startle the eyes (asks for the microphone)
+const RHYTHM = opt('rhythm', 1) > 0;   // sudden sounds (a clap, a step, a beat) make all the watching eyes jump at once
 const STARTLE_MOTION = opt('motion', 0) > 0;   // 1 = sudden movement startles them too (off by default: people walking past set it off)
-const SOUND_LEVEL = 5;          // how much louder than the room a sound must be to startle (x average level)
+const SOUND_LEVEL = 4;          // how much louder than the room a sound must be to startle (x average level)
 const MOTION_LEVEL = 28;        // how big a sudden change in the camera image must be (0-255)
+const DPR = opt('dpr', 2);       // most screen pixels per CSS pixel (1 = lighter on 4K screens and projectors)
+const KIOSK = opt('kiosk', 0) > 0;   // an installation: double-click or double-tap no longer opens the camera view (the D key still does)
+const MOOD = opt('mood', 1);     // the day's mood: frights make it shyer for the next visitors, a pact makes it bolder (0 = every visitor starts the same)
+const OFFLINE = opt('offline', 1) > 0;   // keep a copy of everything in the browser, so it starts without internet after the first time
 
 const structs = [];             // { ratio, GR, GA, NZ } per structure
 const eyes = [];
-let N, irisPx, AI, D, SHADE, inside;   // shared per-pixel lookup tables for the eye buffers
+let N, irisPx, AI, D, SHADE, ALPHA, inside;   // shared per-pixel lookup tables for the eye buffers
 const COS = new Float32Array(A), SIN = new Float32Array(A), CS0 = new Float32Array(A), CZ = new Float32Array(A);
 const LR = new Float32Array(A), LA = new Float32Array(A), HR = new Float32Array(A), HA = new Float32Array(A);
-let fpsAvg = 60, lastAdapt = 0, startMs, rr = 0, cell = 100;
+let fpsAvg = 60, lastAdapt = 0, startMs, rr = 0, rrAcc = 0, cell = 100;
 let cam, small, tiny, detector, lastDetect = 0, seenAt = 0, idleNext = 0, light = 0.35, seed;
 let stirNext = 0, newcomer = null, prevLum = null, mic = null, recorder = null, recDot = null, shock = 0;
 const startle = { at: -1e9, x: 0, y: 0 };
@@ -122,7 +141,7 @@ const nWrap = (x, k, z) => { const a = x / A * TWO_PI; return noise(100 + cos(a)
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  pixelDensity(min(2, displayDensity()));   // sharp on phone and retina screens (the iris buffers follow it)
+  pixelDensity(min(DPR, displayDensity()));   // sharp on phone and retina screens (the iris buffers follow it); dpr=1 for big 4K screens
   seed = Q.has('seed') ? parseInt(Q.get('seed')) : floor(random(1e6));
   randomSeed(seed); noiseSeed(seed);
   console.log('iris seed', seed);
@@ -135,6 +154,11 @@ function setup() {
   focus.x = focusT.x = width / 2; focus.y = focusT.y = height / 2; focus.z = focusT.z = width * FACE_DIST;
   startTracking();
   if (STARTLE_SOUND) startMic();
+  setInterval(watchdog, 1000);   // left alone for days: pointer, screen sleep, camera, nightly fresh start
+  setTimeout(armSound, 1500);    // sound without a click, where the browser allows it (the kiosk start file does)
+  // a copy of every file (p5, the face model, this sketch) kept in the browser, so after one start with internet it
+  // also starts without (sw.js next to index.html; in the p5 web editor there is none, and nothing happens)
+  if (OFFLINE && 'serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
   range(STRUCTS - 1).forEach((k) => buildStructure(k + 1));   // the rest build in the background, one job per frame
   startMs = millis();
   console.log('first frame ready in', round(millis() - t0), 'ms');
@@ -343,7 +367,9 @@ function setEyeCount(n) {
   pals.forEach((pal) => {
     const count = (ty) => eyes.filter((e) => e.type === ty).length;
     const type = shuffle(Object.keys(TYPES)).sort((a, b) => count(a) - count(b))[0];
-    eyes.push(makeEye(pal, type));
+    const e = makeEye(pal, type);
+    e.life = random(LIFE[0], LIFE[1] || LIFE[0]); e.age = random(0.8) * e.life;   // the first ones at all ages, so they don't all die together
+    eyes.push(e);
   });
 }
 
@@ -354,14 +380,16 @@ function makeEye(pal, type) {
     pick: random(), face: -1,
     blinkAt: random(0.5, 4), blinkStart: -1, close: 0, red: random(0.3, 1),
     sc: random(0.65, 1.25), gath: 0, rot: 0, t3x: 0, t3y: 0, has: false, sx: 0, sy: 0, mvx: 0, mvy: 0, pace: random(1.0, 1.8), qNext: random(3), qEye: null, qx: 0, qy: 0, stirUntil: 0, lx: random(-0.45, 0.45), ly: random(-0.45, 0.45),
-    sleep: 0, sleepDelay: random(0, 12), brave: random(), hide: 0, wakeAt: 0, hx: 0, hy: 0, jolt: random(0, 0.15),
+    life: 0, age: 0, alpha: 1, dying: 0, ls: 1,
+    sleep: 0, sleepDelay: random(0, 12), brave: random(), hide: 0, ear: random(), wakeAt: 0, hx: 0, hy: 0, jolt: random(0, 0.15),
     gx: 0, gy: 0, vx: 0, vy: 0, x: 0, y: 0, col: new Uint8ClampedArray(A * R * 3), buf: null, veins: null };
 }
 
 // recolour a structure with this eye's palette: ring colour x local brightness, highlights toward the fibre colour
-function colourise(e) {
+function colourise(e, y0 = 0, y1 = R) {   // rows y0..y1, so a newborn's colours can be spread over a few frames
   const ratio = structs[e.st].ratio, ramp = e.pal.ramp, fib = e.pal.fibre, col = e.col;
-  range(R).forEach((y) => {
+  range(y1 - y0).forEach((yy) => {
+    const y = y0 + yy;
     const sr = min(y / R, 0.999) * 7, k0 = floor(sr), c = mixC(ramp[k0], ramp[k0 + 1], sr - k0);
     range(A).forEach((x) => {
       const src = y * A + (x + e.off) % A, q = ratio[src], j = 3 * (y * A + x);
@@ -476,14 +504,16 @@ function makeVignette() {
 function makeTables(n) {
   N = n;
   irisPx = N * 0.45;
-  AI = new Int32Array(N * N); D = new Float32Array(N * N); SHADE = new Float32Array(N * N);
+  AI = new Int32Array(N * N); D = new Float32Array(N * N); SHADE = new Float32Array(N * N); ALPHA = new Uint8ClampedArray(N * N);
   const ins = [];
   range(N * N).forEach((i) => {
     const x = i % N, y = (i / N) | 0, dx = x - N / 2 + 0.5, dy = y - N / 2 + 0.5;
     const d = sqrt(dx * dx + dy * dy) / irisPx;
     D[i] = d;
     AI[i] = floor((atan2(dy, dx) / TWO_PI + 1) * A) % A;
-    SHADE[i] = 1 - 0.22 * sstep(-0.2, -1, dy / irisPx);
+    // shading that never changes: darker toward the top, a dark rim at the limbus, and the soft outer edge
+    SHADE[i] = (1 - 0.22 * sstep(-0.2, -1, dy / irisPx)) * (1 - 0.45 * sstep(0.96, 1.03, d));
+    ALPHA[i] = 255 * (1 - sstep(1.0, 1.1, d));
     if (d < 1.12) ins.push(i);
   });
   inside = Int32Array.from(ins);
@@ -500,10 +530,11 @@ function renderEye(e, t) {
   const st = structs[e.st], col = e.col, px = e.buf.pixels;
   // pupil: slow breathing + small unrest, narrower in a bright room and when its person comes close
   const pr = (0.34 + 0.05 * sin(TWO_PI * (t + e.phase) / e.breath) + 0.03 * (noise(t * 0.35, e.phase) - 0.5) * 2)
-    * (1.15 - 0.45 * sstep(0.1, 0.7, light)) * (1 - 0.28 * e.close) * (1 + 0.3 * shock);   // fright widens it
-  const aa = 1.5 / irisPx;
+    * (1.15 - 0.45 * sstep(0.1, 0.7, light)) * (1 - 0.28 * e.close) * (1 + 0.3 * shock + 0.3 * pactWide);   // fright widens it, and so does the pact
+  const aa = 1.5 / irisPx, P0 = PUPIL[0], P1 = PUPIL[1], P2 = PUPIL[2];
   inside.forEach((i) => {
-    const d = D[i], ai = AI[i];
+    const d = D[i], ai = AI[i], pe = (pr - d) / aa, p = 4 * i;
+    if (pe >= 1) { const sh = SHADE[i]; px[p] = P0 * sh; px[p + 1] = P1 * sh; px[p + 2] = P2 * sh; px[p + 3] = 255; return; }   // inside the pupil: nothing to light
     let s = (d - pr) / (1 - pr);
     s = s < 0 ? 0 : s > 0.999 ? 0.999 : s;
     const fy = s * (R - 1), y0 = fy | 0, w = fy - y0;
@@ -514,12 +545,9 @@ function renderEye(e, t) {
     let sp = nr * HR[ai] + na * HA[ai] + nz * HZ; sp = sp < 0 ? 0 : sp; sp *= sp; sp *= sp; sp *= sp; sp *= sp; sp *= sp;
     const lit = 0.35 + 0.75 * dif, spec = 50 * sp;
     r = r * lit + spec; g = g * lit + spec; b = b * lit + spec;
-    const pe = (pr - d) / aa;
-    if (pe > -1) { const k = pe > 1 ? 1 : (pe + 1) / 2; r += (PUPIL[0] - r) * k; g += (PUPIL[1] - g) * k; b += (PUPIL[2] - b) * k; }
-    let al = 255;
-    if (d > 0.95) { const k = sstep(0.96, 1.03, d); r *= 1 - 0.45 * k; g *= 1 - 0.45 * k; b *= 1 - 0.45 * k; al = 255 * (1 - sstep(1.0, 1.1, d)); }
-    const sh = SHADE[i], p = 4 * i;
-    px[p] = r * sh; px[p + 1] = g * sh; px[p + 2] = b * sh; px[p + 3] = al;
+    if (pe > -1) { const k = (pe + 1) / 2; r += (P0 - r) * k; g += (P1 - g) * k; b += (P2 - b) * k; }   // the pupil's soft edge
+    const sh = SHADE[i];
+    px[p] = r * sh; px[p + 1] = g * sh; px[p + 2] = b * sh; px[p + 3] = ALPHA[i];
   });
   e.buf.updatePixels();
 }
@@ -547,8 +575,10 @@ function drawFrame() {
     HR[a] = hx * c + hy * sn; HA[a] = -hx * sn + hy * c;
   }
   // re-render a few eyes per frame (pupils breathe slowly, so a few times a second is plenty)
-  // 2 iris renders a frame, however many eyes (pupils change slowly); closed, sleeping eyes are skipped
-  range(2).forEach(() => { const e = eyes[rr % EYES]; rr++; if (e.sleep < 0.95) renderEye(e, t); });
+  // each eye about 5 times a second (2 on a slow machine), at most 2 a frame however many eyes (pupils change
+  // slowly); sleeping eyes are skipped
+  rrAcc = min(2, rrAcc + EYES * (drawMs > 10 ? 2 : 5) * min(0.1, deltaTime / 1000));
+  range(floor(rrAcc)).forEach(() => { const e = eyes[rr % EYES]; rr++; rrAcc--; if (e.sleep < 0.95) renderEye(e, t); });
 
   track();
   background(BG);
@@ -559,6 +589,9 @@ function drawFrame() {
   const away = (millis() - seenAt) / 1000;
   creatureMoves(t, dt);
   storyStep(dt);
+  pactStep(dt);
+  farewellStep();
+  lifeStep(dt);
   if (QUIET && t > stirNext) {   // asleep: now and then one of them half wakes, looks around, and goes back to sleep
     const asleep = eyes.filter((e) => e.sleep > 0.9);
     if (asleep.length) random(asleep).stirUntil = t + random(3, 6);
@@ -570,10 +603,12 @@ function drawFrame() {
     // nobody there for a while: each eye gets drowsy and closes, one after another; awake again at once
     // (when someone arrives, each eye waits for the waking wave to reach it)
     if (STORY && faces.length) {   // the beast: frightened eyes shut tight; the shy ones peek half-closed from where they hide
-      const want = millis() < e.hide ? 1 : 0.55 * constrain((e.brave - (trust * 1.3 + 0.12)) / 0.3, 0, 1);   // the next to dare open up first: you can see it listening
+      const want = millis() < e.hide ? 1 : min(1, 0.55 * constrain((e.brave - braveLine()) / 0.3, 0, 1)   // the next to dare open up first: you can see it listening
+        + (companion ? 0 : 0.45 * heard * (1 - trust)));   // scared, a sound makes it squint
       e.sleep += (want - e.sleep) * min(1, dt * (want > e.sleep ? 5 : 1.5));
     } else if (away > SLEEP_AFTER + e.sleepDelay) e.sleep = QUIET && t < e.stirUntil ? max(0, e.sleep - dt * 1.5) : min(1, e.sleep + dt / 5);
     else if (millis() >= e.wakeAt) e.sleep = max(0, e.sleep - dt * 3);
+    if (e.dying) e.sleep = max(e.sleep, min(1, e.dying * 1.5));   // dying: its eye closes for the last time
     // each eye rotates toward its own target, at its own speed (saccade-like)
     const g = gazeTarget(e, t, dt);
     // aim from a point between this eye and the screen centre: mostly parallel gaze, a little convergence
@@ -583,15 +618,15 @@ function drawFrame() {
     const dx = tgx - e.gx, dy = tgy - e.gy, err = sqrt(dx * dx + dy * dy);
     // moving like a real eye, but without steps: a critically damped spring (smooth speed, no overshoot) that is
     // soft while it follows you (pursuit) and much stiffer for a big change of target (a quick saccade)
-    let w = err > 0.15 ? min(0.5, 0.2 + e.speed) : 0.08 + e.speed * 0.25;
+    let w = err > 0.15 ? min(0.5, 0.2 + e.speed) * (0.5 + 0.5 * TEMPO) : 0.08 + e.speed * 0.25;   // following you stays quick
     if (shock > 0.4) w = 0.5; else if (e.sleep > 0.3) w *= 0.4;
     range(steps).forEach(() => {   // timed in 1/60 s units, so the eyes move at the same speed at any frame rate
       e.vx += h * (w * w * (tgx - e.gx) - 2 * w * e.vx); e.vy += h * (w * w * (tgy - e.gy) - 2 * w * e.vy);
       e.gx += h * e.vx; e.gy += h * e.vy;
     });
-    e.close = lerp(e.close, e.face >= 0 && faces[e.face] ? faces[e.face].close : 0, 0.03);
+    e.close = lerp(e.close, e.watch ? 1 : e.face >= 0 && faces[e.face] ? faces[e.face].close : 0, 0.03);   // guarding: narrow, hard pupils
     // tilt: the eye's long axis turns toward the person it watches, so its look along it reads as a stare
-    const pf = e.face >= 0 && faces[e.face];
+    const pf = e.watch || (e.face >= 0 && faces[e.face]);
     const head = (1 - e.sleep) * lerp(0.75, 1, e.gath);   // every awake eye turns toward you like a head, gathered ones fully
     let rt = 0;
     if (pf && TILT > 0) { let a = atan2(pf.y - e.y, pf.x - e.x); if (a > HALF_PI) a -= PI; else if (a < -HALF_PI) a += PI; rt = constrain(a, -TILT, TILT) * head; }
@@ -617,6 +652,7 @@ function drawFrame() {
     const ctx = drawingContext;
     if (L.shut > 0.97) return;                  // closed: nothing left in the dark
     ctx.save(); ctx.translate(e.x, e.y);
+    ctx.globalAlpha = e.alpha;   // being born or dying: it comes out of the dark, or goes back into it
     if (turn > 0.01) {   // turned: the opening slides a little toward where it faces (it sits on a ball) and its far side narrows
       ctx.translate(cos(tdir) * sin(turn) * rb * 0.3, sin(tdir) * sin(turn) * rb * 0.3);
       ctx.rotate(tdir); ctx.scale(cos(turn), 1); ctx.rotate(-tdir);
@@ -625,7 +661,7 @@ function drawFrame() {
     ctx.save();
     lidPath(ctx, e.x, e.y, L); ctx.clip();      // everything of the eye is seen through the lid opening
     sclera(e.x, e.y, rb, lphi);
-    if (VEINS > 0) { if (!e.veins) e.veins = makeVeins(e); ctx.globalAlpha = VEINS; ctx.drawImage(e.veins.elt, e.x - rb, e.y - rb, 2 * rb, 2 * rb); ctx.globalAlpha = 1; }
+    if (VEINS > 0) { if (!e.veins) e.veins = makeVeins(e); ctx.globalAlpha = VEINS * e.alpha; ctx.drawImage(e.veins.elt, e.x - rb, e.y - rb, 2 * rb, 2 * rb); ctx.globalAlpha = e.alpha; }
     ctx.save();   // canvas calls, not p5 push/pop: p5 2.x pop() would undo the eye's tilt
     ctx.translate(e.x + off * cos(dir), e.y + off * sin(dir));
     ctx.rotate(dir); ctx.scale(cos(th), 1); ctx.rotate(-dir);
@@ -655,7 +691,9 @@ function drawFrame() {
     ctx.restore();
   });
   if (vig && recorder) drawingContext.drawImage(vig.elt, 0, 0, width, height);   // videos include the vignette
+  narrate(min(0.1, deltaTime / 1000));   // over the eyes, so it can be read
   if (showCam) camView();
+  else if (camStatus()) { noStroke(); fill(222, 214, 204, 60); textSize(12); textAlign(LEFT, BASELINE); text(camStatus(), 12, height - 12); }   // quietly, for whoever looks after it
   runCalib();
   breathe(dt);
   adapt();
@@ -668,13 +706,24 @@ function creatureMoves(t, dt) {
   cell = lerp(cell, cellT, min(1, dt * 1.2));   // after a change of count the eyes grow or shrink slowly
   if (AROUND && faces.length && millis() > slotsAt) { assignSlots(); slotsAt = millis() + 400; }
   eyes.forEach((e) => {
-    const p = e.face >= 0 && faces[e.face], here = p && e.has && e.sleep < 0.5 && AROUND && brave(e);
+    const p = e.face >= 0 && faces[e.face], here = p && e.has && e.sleep < 0.5 && AROUND && brave(e) && !e.dying;
     e.gath = lerp(e.gath, here ? 1 : 0, min(1, dt * 1.5));
     let tx = here ? e.sx : e.hx, ty = here ? e.sy : e.hy;   // its spot around you, or its own place in the scatter
-    if (STORY && !here && faces.length) {   // not ready to come: it keeps its distance from you, more the less it trusts you
-      const q = faces[0], ax = tx - q.x, ay = ty - q.y, d = sqrt(ax * ax + ay * ay) || 1;
-      const k = cell * 2.2 * (1 - trust) * (1 + 1.5 * (q.moving || 0)) * max(0, 1 - d / (width * 0.8));   // and flees further while you move
-      tx = constrain(tx + ax / d * k, cell * 0.2, width - cell * 0.2); ty = constrain(ty + ay / d * k, cell * 0.2, height - cell * 0.2);
+    const still = pactT() < 4.5;   // the pact: they stay where they are until it is sealed
+    let run = 0;
+    if (farewell && !faces.length && farewell.close && e.ear < 0.4 && farewellT() < 6) {   // the closest companions drift a little way after you
+      const k = 0.45 * sstep(0, 2, farewellT()) * (1 - sstep(4, 6, farewellT()));
+      tx = lerp(tx, farewell.x, k); ty = lerp(ty, farewell.y, k * 0.6);
+    }
+    if (still) { tx = e.x; ty = e.y; } else if (STORY && !here && faces.length) {   // not ready to come: it runs from you and leaves an empty space around you, wider the less it trusts you
+      const q = faces[0], m = cell * 0.3, ax = tx - q.x, ay = ty - q.y, d = sqrt(ax * ax + ay * ay) || 1, ux = ax / d, uy = ay / d;
+      run = constrain(SHY * (1 - trust) * (1 + 0.5 * MOOD * mood), 0, 1.5);   // shyer on a day of frights
+      // how far the screen goes in this direction, so the scatter is squeezed toward the edges, never piled on them
+      const rx = ux > 0.01 ? (width - m - q.x) / ux : ux < -0.01 ? (q.x - m) / -ux : 1e9, ry = uy > 0.01 ? (height - m - q.y) / uy : uy < -0.01 ? (q.y - m) / -uy : 1e9;
+      const rmax = max(cell, min(rx, ry)), gap = min(rmax * 0.85, width * 0.4 * run * (1 + 0.6 * (q.moving || 0)));   // the space opens wider while you move
+      const nd = gap + min(d, rmax) * (rmax - gap) / rmax;
+      tx = constrain(q.x + ux * nd, m, width - m); ty = constrain(q.y + uy * nd, m, height - m);
+      run *= 1 + 2 * (q.moving || 0) + (d < gap ? 1 : 0);   // in a hurry while you move, or while it is still too close
     }
     if (shock > 0.3) {                      // startled: away from the sound or movement
       const ax = e.x - startle.x, ay = e.y - startle.y, d = sqrt(ax * ax + ay * ay) || 1;
@@ -682,8 +731,12 @@ function creatureMoves(t, dt) {
     }
     const wob = cell * lerp(0.12, 0.03, e.gath);   // held still while they watch you
     tx += (noise(t * 0.15, e.phase) - 0.5) * wob; ty += (noise(e.phase, t * 0.15) - 0.5) * wob;
+    if (STORY && !here && faces.length && !companion) {   // afraid: it trembles, more while you move
+      const tr = cell * 0.1 * SHY * (1 - trust) * (1 + 2 * (faces[0].moving || 0));
+      tx += (noise(t * 2.5, e.phase) - 0.5) * tr; ty += (noise(e.phase, t * 2.5) - 0.5) * tr;
+    }
     // glide there, each eye at its own pace, curving around your face
-    const w = e.pace, steps = constrain(ceil(dt * 60), 1, 6), h = dt / steps;
+    const w = e.pace * SNAP * (t < e.rushUntil ? 2 : 1) * (1 + 0.7 * min(run, 2)), steps = constrain(ceil(dt * 60), 1, 6), h = dt / steps;   // hurrying to greet you
     range(steps).forEach(() => {
       let ax = w * w * (tx - e.x) - 2 * w * e.mvx, ay = w * w * (ty - e.y) - 2 * w * e.mvy;   // critically damped: glide in and settle, no overshoot
       faces.forEach((q) => {   // keep off every face: pushed out to the side, so paths bend around it
@@ -706,6 +759,7 @@ function assignSlots() {
     const group = eyes.filter((e) => e.face === fi && e.sleep < 0.5 && brave(e));
     if (!group.length) return;
     const big = 1 + GROW * grow, slots = [], gap = cell * 0.9 * big;   // grown eyes need wider rings
+    const st = STORY && companion && fi === 0 && stranger(), wall = st && { x: (st.x - p.x) / (dist(st.x, st.y, p.x, p.y) || 1), y: (st.y - p.y) / (dist(st.x, st.y, p.x, p.y) || 1) };
     range(8).forEach((k) => {
       if (slots.length >= group.length * 1.5) return;
       const rx = cell * (AROUND_HOLE * big + (1 - trust) * 3.2 + 0.62 * k * big) * 1.1,   // the less it trusts you, the wider it circles
@@ -719,6 +773,7 @@ function assignSlots() {
     group.forEach((e) => slots.forEach((sl, j) => {
       let c = sqrt(sq(sl.x - e.x) + sq(sl.y - e.y)) + sl.k * cell * 3;   // inner ring first, even if it is a longer trip
       if (e.sxPrev !== undefined && sq(sl.x - e.sx) + sq(sl.y - e.sy) < sq(gap * 0.6)) c -= gap * 0.8;   // keep its spot
+      if (wall) c -= ((sl.x - p.x) * wall.x + (sl.y - p.y) * wall.y) / (sqrt(sq(sl.x - p.x) + sq(sl.y - p.y)) || 1) * cell * 3;   // guarding: between you and the stranger
       pairs.push([c, e, j]);
     }));
     pairs.sort((a, b) => a[0] - b[0]);
@@ -789,6 +844,23 @@ function breathe(dt) {
   voice.lp.frequency.setTargetAtTime((200 + 650 * env * (0.5 + watching)) * (1 - 0.35 * near), now, 0.08);   // closer = warmer, darker
   voice.og.gain.setTargetAtTime(0.015 + 0.035 * watching + 0.04 * near, now, 0.4);   // and more body underneath
   voice.osc.frequency.setTargetAtTime(44 + 8 * watching - 6 * near + 20 * shock, now, 0.4);
+  const pt = pactT();
+  if (pt >= 0 && pt < 5.5) {   // the pact: it holds its breath, then one long deep breath as the eyes open
+    const b = pt < 1.2 ? 0 : sin(PI * constrain((pt - 1.2) / 4.2, 0, 1)), d = pow(b, 1.3);
+    voice.g.gain.setTargetAtTime(0.01 + 0.4 * d, now, 0.15);
+    voice.lp.frequency.setTargetAtTime(160 + 700 * d, now, 0.15);
+    voice.og.gain.setTargetAtTime(0.03 + 0.1 * d, now, 0.3);
+    voice.osc.frequency.setTargetAtTime(36 + 6 * d, now, 0.4);
+    voice.phase = 0.75;   // and the usual breathing starts again from a pause
+  }
+  const ft = farewellT();
+  if (ft > 2.5 && ft < 8 && !faces.length) {   // its friend has gone: one long breath out
+    const u = constrain((ft - 2.5) / 5.5, 0, 1), d = sstep(0, 0.15, u) * pow(1 - u, 1.6);
+    voice.g.gain.setTargetAtTime(0.02 + 0.3 * d, now, 0.2);
+    voice.lp.frequency.setTargetAtTime(180 + 500 * d, now, 0.2);
+    voice.osc.frequency.setTargetAtTime(38 + 4 * d, now, 0.4);
+    voice.phase = 0.75;
+  }
 }
 
 // where this eye wants to look: its chosen person, a newcomer, a startle, or (nobody there) its quiet idle gaze
@@ -807,22 +879,89 @@ function remember(o, now) {   // keep the last moment of positions for delayed()
 }
 
 function gazeTarget(e, t, dt) {
-  e.face = faces.length ? min(faces.length - 1, floor(e.pick * faces.length)) : -1;
+  // with several people each eye picks one; the beast belongs to one person (its friend, always faces[0])
+  e.face = !faces.length ? -1 : STORY ? 0 : min(faces.length - 1, floor(e.pick * faces.length));
+  e.watch = STORY ? guardOf(e) : null;
   // startled: everyone snaps toward the sound or movement (each a split second apart)
   if (t - startle.at > e.jolt && t - startle.at < 1 + e.jolt) return { x: startle.x, y: startle.y, z: width * FACE_DIST * 0.8 };
   // someone new arrived: for a moment all eyes turn to them
   if (newcomer && millis() < newcomer.until && faces.includes(newcomer.p)) return delayed(newcomer.p, e);
+  if (STORY && !faces.length && farewellT() < 7) return { x: farewell.x + (e.lx || 0) * cell, y: farewell.y + (e.ly || 0) * cell, z: width * FACE_DIST };   // watching you go
   if (QUIET && !faces.length) return quietGaze(e, t);
+  if (e.watch) return delayed(e.watch, e);   // guarding you: it stares the stranger down
+  if (STORY && faces.length && !companion && !brave(e)) { const g = shyGaze(e, t); if (g) return g; }
+  if (STORY && faces.length) { const g = watchGaze(e, t); if (g) return g; }
   const who = e.face >= 0 ? faces[e.face] : focus;
   return delayed(who, e);
 }
 
 // nobody there: each eye looks at a neighbour or lets its gaze drift; a neighbour sometimes looks back and blinks
+// Listening for danger: it hears before it sees. A sound sets some eyes searching, darting from spot to spot,
+// more eyes and faster the louder it is; in silence they calm down again (asleep, a sound half wakes a few)
+let heard = 0;
+// rhythm: on each sudden sound, every eye that is awake and searching jumps to a new spot at the same moment
+// (a few sleeping ones half wake); with music they dart together on the beat
+function onBeat() {
+  const t = millis() / 1000;
+  heard = max(heard, 0.3);
+  if (faces.length) {   // someone is here: scared, it flinches; your companion, its watchers turn out together
+    if (STORY) eyes.forEach((e) => {
+      if (companion) { if (e.ear < 0.5) { e.wUntil = t + random(0.5, 0.9); e.wNext = e.wUntil; watchSpot(e); } }
+      else if (random() < 0.6) e.blinkAt = min(e.blinkAt, t + random(0, 0.08));
+    });
+    if (STORY && !companion) addTrust(-0.04, 'a sharp sound');   // each clap or bang costs a little
+    return;
+  }
+  eyes.forEach((e) => {
+    if (e.sleep > 0.8) { if (random() < 0.2) e.stirUntil = t + random(1, 2.5); return; }
+    e.qEye = null; e.qx = random(0.05, 0.95) * width; e.qy = random(0.1, 0.9) * height;
+    e.qNext = t + random(0.4, 0.9);   // hold the new look a moment, so the jump reads as one movement
+  });
+}
+// someone is here and it hears something. Scared: its eyes glance round nervously, away from you (and it won't
+// trust you while it's noisy, so quiet earns trust too). Your companion: it keeps watch for you; about half
+// the eyes turn out to search the room, the rest stay on you, then they come back
+function watchGaze(e, t) {
+  const share = companion ? 0.5 : 1;
+  if (!(t < e.wUntil) && (heard < 0.05 || e.ear > heard * 1.3 * share)) return null;
+  if (!(t < e.wNext)) {
+    e.wNext = t + lerp(random(0.8, 1.6), random(0.2, 0.5), heard);
+    watchSpot(e);
+  }
+  return { x: e.wx, y: e.wy, z: width * FACE_DIST * 1.5 };
+}
+// afraid: it can't hold your gaze. It looks away, out of the corner of its eye, and now and then steals a quick
+// look at you; the more it trusts you, the longer and more often it looks
+function shyGaze(e, t) {
+  const p = faces[0];
+  if (!(t < e.avNext)) {
+    e.peek = random() < 0.25 + 0.5 * trust;
+    e.avNext = t + (e.peek ? random(0.6, 1.2) + trust : random(1.5, 3.5) * (1 - 0.5 * trust)) / TEMPO;
+    if (!e.peek) {   // away: past itself, on the far side from you
+      const ax = e.x - p.x, ay = e.y - p.y, d = sqrt(ax * ax + ay * ay) || 1, a = atan2(ay, ax) + random(-0.7, 0.7);
+      e.avx = constrain(e.x + cos(a) * width * 0.5, 0, width); e.avy = constrain(e.y + sin(a) * height * 0.5, 0, height);
+    }
+  }
+  return e.peek ? null : { x: e.avx, y: e.avy, z: width * FACE_DIST };
+}
+// a spot out in the room, away from you (scared, it looks anywhere but at you; your companion watches the room for you)
+function watchSpot(e) {
+  const p = faces[0];
+  let best = -1;
+  range(4).forEach(() => {
+    const x = random(0.05, 0.95) * width, y = random(0.1, 0.9) * height, d = p ? sq(x - p.x) + sq(y - p.y) : 1;
+    if (d > best) { best = d; e.wx = x; e.wy = y; }
+  });
+}
 function quietGaze(e, t) {
+  const a = e.ear < heard * 1.3 ? heard : 0;
+  if (a > 0.05 && e.sleep > 0.8 && t > e.stirUntil) e.stirUntil = t + random(1.5, 3);
+  if (a > 0.05 && e.qNext - t > lerp(2, 0.9, a)) e.qNext = t + random(0, 0.3);   // a new sound cuts a long look short
   if (t > e.qNext) {
-    e.qNext = t + random(2, 6);
+    e.qNext = t + lerp(random(2, 6), random(0.15, 0.5), a);
     e.qEye = null;
-    if (random() < 0.5) {
+    if (a > 0.05) { e.qx = random(0.05, 0.95) * width; e.qy = random(0.1, 0.9) * height; }   // searching
+    else if (random() < 0.5) {
       const near = eyes.filter((o) => o !== e).sort((a, b) => sq(a.x - e.x) + sq(a.y - e.y) - sq(b.x - e.x) - sq(b.y - e.y));
       e.qEye = random(near.slice(0, 3));
       const o = e.qEye;
@@ -842,7 +981,7 @@ function lids(e, rb, t) {
     else c = u < 0.35 ? sstep(0, 0.35, u) : 1 - sstep(0.35, 1, u);
   }
   if (e.sleep > 0) c = max(c, e.sleep >= 1 ? 1 : e.sleep * (0.75 + 0.25 * noise(t * 0.6, e.phase)));   // drowsy lids sag and flutter
-  const vg = constrain((e.gy * cos(e.rot) - e.gx * sin(e.rot)) / radians(MAX_TURN), -1, 1), open = e.ty.lid * (1 + 0.3 * shock);   // wide open when startled
+  const vg = constrain((e.gy * cos(e.rot) - e.gx * sin(e.rot)) / radians(MAX_TURN), -1, 1), open = e.ty.lid * (1 + 0.3 * shock + 0.3 * pactWide + (companion && faces.length ? 0.15 * heard : 0) + (e.watch ? 0.2 : 0));   // wide open when startled; alert when your companion hears something
   let up = e.y - rb * (0.5 - 0.35 * vg) * open, lo = e.y + rb * (0.42 + 0.18 * vg);
   const meet = lerp(up, lo, 0.75);
   up = lerp(up, meet, c); lo = lerp(lo, meet, c);
@@ -903,15 +1042,18 @@ function catchlight(cx, cy, r, phi) {
 
 // ---------- face tracking ----------
 
+function openCamera() {
+  cam = createCapture(VIDEO);
+  cam.size(320, 240);
+  // keep the video "on the page" but invisible: a hidden (display: none) video is not refreshed by some
+  // browsers (iPhone Safari especially), so the face search would keep looking at an old frame
+  cam.elt.setAttribute('playsinline', ''); cam.elt.muted = true;
+  cam.style('position', 'fixed'); cam.style('left', '0'); cam.style('top', '0');
+  cam.style('width', '2px'); cam.style('height', '2px'); cam.style('opacity', '0.01'); cam.style('pointer-events', 'none');
+}
 async function startTracking() {
   try {
-    cam = createCapture(VIDEO);
-    cam.size(320, 240);
-    // keep the video "on the page" but invisible: a hidden (display: none) video is not refreshed by some
-    // browsers (iPhone Safari especially), so the face search would keep looking at an old frame
-    cam.elt.setAttribute('playsinline', ''); cam.elt.muted = true;
-    cam.style('position', 'fixed'); cam.style('left', '0'); cam.style('top', '0');
-    cam.style('width', '2px'); cam.style('height', '2px'); cam.style('opacity', '0.01'); cam.style('pointer-events', 'none');
+    openCamera();
     const vision = await import(MP + '/vision_bundle.mjs');
     const files = await vision.FilesetResolver.forVisionTasks(MP + '/wasm');
     const make = (delegate) => BLINK_BACK
@@ -937,6 +1079,7 @@ async function startTracking() {
     }
   } catch (e) {
     console.warn('face tracking off (eyes will idle):', e);
+    trackFail = true;
   }
 }
 
@@ -988,11 +1131,22 @@ function detectFaces(v) {
   return found;
 }
 
+// what is wrong, if anything: no camera, or the face search couldn't load (no internet on the first start)
+function camStatus() {
+  if (trackFail) return 'face search not loaded (no internet?)';
+  if (millis() - startMs > 10000 && !camWorked) return 'no camera';
+  return '';
+}
+
 // D key: the camera image (mirrored, like a mirror) with the faces found and the area searched
 function camView() {
-  const v = cam && cam.elt;
-  if (!v || v.readyState < 2) return;
-  const W = min(200, width * 0.45), H = W * (v.videoHeight || 3) / (v.videoWidth || 4), X = width - W - 12, Y = 12, ctx = drawingContext;
+  const v = cam && cam.elt, W = min(200, width * 0.45), X = width - W - 12;
+  const H = v && v.readyState >= 2 ? W * (v.videoHeight || 3) / (v.videoWidth || 4) : 0, Y = 12, ctx = drawingContext;
+  // the machine: smooth enough? how many eyes, how long one face search takes, and the day's mood
+  noStroke(); fill(255); textSize(12); textAlign(RIGHT, BASELINE);
+  text(round(fpsAvg) + ' fps · ' + EYES + ' eyes · face search ' + round(detMs) + ' ms' + (STORY && MOOD ? ' · mood ' + (mood > 0.05 ? 'wary ' : mood < -0.05 ? 'bold ' : '') + mood.toFixed(2) : ''), width - 12, Y + H + 70);
+  textAlign(LEFT, BASELINE);
+  if (!H) { text(camStatus() || 'camera starting', X, Y + 16); return; }
   ctx.save(); ctx.translate(X + W, Y); ctx.scale(-1, 1); ctx.drawImage(v, 0, 0, W, H); ctx.restore();
   noFill(); strokeWeight(1);
   stroke(255, 200, 0); rect(X + (1 - lastCrop.x - lastCrop.s) * W, Y + lastCrop.y * H, lastCrop.s * W, lastCrop.s * H);
@@ -1002,7 +1156,7 @@ function camView() {
   text(faces.length + (faces.length === 1 ? ' person' : ' people') + (lastCrop.s < 1 ? ' (zoomed search)' : ''), X, Y + H + 16);
   if (STORY) {   // the beast's trust, and the last thing it read in you
     noFill(); stroke(255, 120); rect(X, Y + H + 26, W, 6); noStroke(); fill(255, 200, 120); rect(X, Y + H + 26, W * trust, 6);
-    fill(255); text('trust ' + trust.toFixed(2) + (companion ? ' · companion' + (grow > 0.05 ? ', grown ' + round(100 * GROW * grow) + '%' : '') : '') + (millis() - trustNoteAt < 4000 ? ' · ' + trustNote : ''), X, Y + H + 50);
+    fill(255); text('trust ' + trust.toFixed(2) + (companion ? ' · companion' + (grow > 0.05 ? ', grown ' + round(100 * GROW * grow) + '%' : '') : '') + (millis() - trustNoteAt < 4000 ? ' · ' + trustNote : '') + (companion && stranger() ? ' · guarding you' : '') + (mem ? ' · remembers someone, ' + ceil(REMEMBER - (millis() - mem.at) / 1000) + ' s' : ''), X, Y + H + 50);
   }
 }
 
@@ -1028,7 +1182,7 @@ function measureLight(v) {
 function startleAt(x, y) {
   if (millis() / 1000 - startle.at < 4 || millis() - startMs < 3000) return;   // not again for a few seconds, nor while the camera starts
   startle.at = millis() / 1000; startle.x = x; startle.y = y;
-  if (STORY) { fright(0.2, 'a loud sound', true); return; }
+  if (STORY) { fright(0.25, 'a loud sound', true); return; }
   eyes.forEach((e) => { e.sleep = 0; e.blinkStart = -1; e.blinkAt = startle.at + random(1.2, 2.5); });
   console.log('startle');
 }
@@ -1036,12 +1190,13 @@ function startleAt(x, y) {
 // microphone level (Web Audio, nothing recorded or sent); a sound much louder than the room startles
 async function startMic() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // no noise suppression or automatic volume: they flatten claps, steps and beats (echo cancellation stays, so it doesn't hear its own breath)
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false } });
     const ac = new (window.AudioContext || window.webkitAudioContext)();
     const an = ac.createAnalyser(), mute = ac.createGain();
     an.fftSize = 512; mute.gain.value = 0;
     ac.createMediaStreamSource(stream).connect(an); an.connect(mute); mute.connect(ac.destination);
-    mic = { ac, an, buf: new Float32Array(512), base: 0.01 };
+    mic = { ac, an, buf: new Float32Array(512), base: 0.01, recent: 0.01, hitAt: 0 };
     console.log('sound startle on' + (ac.state === 'running' ? '' : ' (click or press a key once to arm it)'));
   } catch (e) {
     console.warn('sound startle off:', e);
@@ -1049,15 +1204,22 @@ async function startMic() {
 }
 
 function listen() {
+  heard *= pow(0.4, min(0.1, deltaTime / 1000));   // what it heard fades over a few seconds
   if (!mic || mic.ac.state !== 'running') return;
   mic.an.getFloatTimeDomainData(mic.buf);
   let s = 0;
   mic.buf.forEach((v) => { s += v * v; });
   const rms = sqrt(s / 512);
-  if (rms > max(0.05, mic.base * SOUND_LEVEL)) {   // loud: look out at whoever is there, or straight ahead
+  // any sound above the room's own hum: the eyes hear something (0..1), and it fades over a few seconds
+  const now = max(0, min(1, (rms / max(0.003, mic.base) - 1.8) / 5));
+  heard = max(heard, now);
+  // a sudden sound: much louder than a moment ago, and well above the room
+  if (RHYTHM && rms > mic.recent * 1.8 && rms > max(0.01, mic.base * 2.5) && millis() - mic.hitAt > 150) { mic.hitAt = millis(); onBeat(); }
+  mic.recent = lerp(mic.recent, rms, 0.3);
+  if (rms > max(0.035, mic.base * SOUND_LEVEL)) {   // loud: look out at whoever is there, or straight ahead
     const f = faces[0];
     startleAt(f ? f.x : width / 2, f ? f.y : height / 2);
-  } else mic.base = lerp(mic.base, rms, 0.02);
+  } else mic.base = lerp(mic.base, rms, now > 0 ? 0.002 : 0.02);   // a voice or steps don't become the new quiet
 }
 
 // camera position (0..1) to screen: mirrored (you on the right of the camera = right of the screen), widened by GAIN.
@@ -1126,7 +1288,7 @@ function euro(minCut, beta) {
   };
 }
 
-let detMs = 10, rvfc = false, lightN = 0, fpsTarget = 60, curRate = 60, lowCount = 0, drops = 0, droppedAt = 0, drawMs = 5;
+let trackFail = false, detMs = 10, rvfc = false, lightN = 0, fpsTarget = 60, curRate = 60, lowCount = 0, drops = 0, droppedAt = 0, drawMs = 5;
 // how often to look: often while someone is there, rarely when nobody is, and never more than ~25% of the time
 const detectInterval = () => max(faces.length ? 66 : 150, detMs * 4, BLINK_BACK ? 100 : 0);
 
@@ -1146,11 +1308,15 @@ function detectNow() {
 function updateFaces(found) {
   const now = millis(), t = now / 1000, matched = [];
   found.forEach((f) => {
-    let p = null, bd = 0.2;
-    faces.forEach((o) => { if (matched.includes(o)) return; const d = sqrt(sq(o.fx.x() - f.fx) + sq(o.fy.x() - f.fy)); if (d < bd) { bd = d; p = o; } });
+    let p = null, bd = 0;
+    faces.forEach((o) => { if (matched.includes(o)) return; const d = sqrt(sq(o.fx.x() - f.fx) + sq(o.fy.x() - f.fy)), r = max(0.2, 1.5 * o.w.x()); if (d < r && (!p || d < bd)) { bd = d; p = o; } });   // close to the camera a head moves further
+    if (!p) {   // someone the camera lost a moment ago, found again somewhere else: the same person, not a newcomer (keeps its trust)
+      const lost = faces.filter((o) => !matched.includes(o) && now - o.lastSeen > 250 && sqrt(sq(o.fx.x() - f.fx) + sq(o.fy.x() - f.fy)) < 0.5 && !found.some((g) => g !== f && sqrt(sq(o.fx.x() - g.fx) + sq(o.fy.x() - g.fy)) < max(0.2, 1.5 * o.w.x())));
+      if (lost.length) { p = lost[0]; p.fx = euro(0.3, 1); p.fy = euro(0.3, 1); p.w = euro(0.5, 1); p.jumpAt = now; }
+    }
     if (!p) {
       if (faces.length >= MAX_FACES) return;
-      p = { fx: euro(0.3, 1), fy: euro(0.3, 1), w: euro(0.5, 1), since: now, wasShut: false, close: 0, x: toScreenX(f.fx), y: toScreenY(f.fy), z: width * FACE_DIST };
+      p = { fx: euro(0.3, 1), fy: euro(0.3, 1), w: euro(0.5, 1), since: now, wasShut: false, close: 0, x: toScreenX(f.fx), y: toScreenY(f.fy), z: width * FACE_DIST, ax: toScreenX(f.fx), aw: f.w };   // ax, aw: where and how big they arrived
       if (faces.length) newcomer = { p, until: now + 3000 };                                     // someone joined: all eyes turn to them
       else if (eyes.some((e) => e.sleep > 0.3)) wakeWave(toScreenX(f.fx), toScreenY(f.fy));   // woken up by someone arriving
       faces.push(p);
@@ -1215,6 +1381,7 @@ function adapt() {
   // all asleep: run slowly (saves battery and heat in an installation); awake again at the normal rate
   const want = eyes.every((e) => e.sleep >= 1) ? 20 : fpsTarget;
   if (want !== curRate) { curRate = want; frameRate(want); fpsAvg = want; lastAdapt = millis(); }   // measure afresh after a change
+  if (grow > 0.05) lastAdapt = millis();   // grown round you costs more for a while: not a reason to lose eyes
   if (millis() - lastAdapt > 2000 && millis() - startMs > 4000 && want === fpsTarget) {
     lastAdapt = millis();
     // a machine that can't keep 60 gets a steady 30 (even timing looks smoother than a wobbly 40);
@@ -1235,16 +1402,57 @@ function adapt() {
   }
 }
 
+// ---------- lost souls: the life cycle ----------
+function lifeStep(dt) {
+  if (!LIVES || LAYOUT === 'grid') return;
+  eyes.forEach((e) => {
+    if (e.ready === false) return;   // a newborn still getting its colours
+    if (!e.dying && e.alpha < 1) { e.alpha = min(1, e.alpha + dt / BORN_S); e.ls = 0.3 + 0.7 * sstep(0, 1, e.alpha); }   // born: grows out of a point of light
+    // held: close round you (the inner ring) or guarding you; those never die then. The rest of the ring ages
+    // a little slower, so now and then a soul passes quietly at the edge of your circle
+    const held = faces.length && (e.watch || faces.some((p) => sq(e.x - p.x) + sq(e.y - p.y) < sq(cell * 1.6 * (1 + GROW * grow * 0.6))));
+    e.age += dt * (held ? 0.2 : e.gath > 0.2 ? 0.6 : 1);
+    if (!e.dying && e.age > e.life && !held && shock < 0.1) e.dying = 0.001;   // never in the middle of a moment with you
+    if (!e.dying) return;
+    e.dying += dt / DIE_S;
+    // it closes for the last time, shrinks and rises slowly into the dark
+    e.alpha = 1 - sstep(0.4, 1, e.dying); e.ls = 1 - 0.75 * sstep(0.25, 1, e.dying);
+    e.hy -= cell * 0.25 * dt * sstep(0.2, 0.6, e.dying);
+    if (e.dying >= 1) reborn(e);
+  });
+}
+// a new soul in place of the old one: new colours, size and character, somewhere free in the dark, away from people
+function reborn(e) {
+  const count = (ty) => eyes.filter((o) => o.type === ty).length;
+  const type = shuffle(Object.keys(TYPES)).sort((a, b) => count(a) - count(b))[0];
+  const pal = naturalPalettes(1, eyes.filter((o) => o !== e).map((o) => o.pal))[0];
+  const keep = { buf: e.buf, col: e.col }, ox = e.hx, oy = e.hy;
+  if (e.veins) e.veins.remove();
+  Object.assign(e, makeEye(pal, type), keep);
+  let bd = -1;
+  range(60).forEach(() => {
+    const x = random(0.04, 0.96) * width, y = random(0.06, 0.94) * height;
+    let d = 2 * min(x, width - x, y * 1.6, (height - y) * 1.6);
+    eyes.forEach((o) => { if (o !== e) d = min(d, sqrt(sq(x - o.hx) + sq((y - o.hy) * 1.6))); });
+    faces.forEach((p) => { d = min(d, sqrt(sq(x - p.x) + sq(y - p.y)) * 0.5); });
+    d = min(d, sqrt(sq(x - ox) + sq(y - oy)) * 0.5);   // not where the old one just died
+    if (d > bd) { bd = d; e.x = e.hx = x; e.y = e.hy = y; }
+  });
+  e.s = e.sc; e.life = random(LIFE[0], LIFE[1] || LIFE[0]); e.age = 0; e.alpha = 0; e.ls = 0.3; e.sxPrev = undefined;
+  e.sleep = 1; e.wakeAt = 1e12; e.ready = false;
+  drawOrder = eyes.slice().sort((a, b) => a.s - b.s);
+  range(4).forEach((k) => jobs.push(() => colourise(e, k * R / 4, (k + 1) * R / 4)));   // a quarter of its colours a frame: no hitch
+  jobs.push(() => { renderEye(e, millis() / 1000); e.ready = true; e.wakeAt = millis() + random(800, 2000); });   // it opens slowly, after it appears
+}
+
 // ---------- the beast's trust ----------
-// 1 scared: the eyes keep away from you, further while you move, so following them only drives them off.
-// 2 stay still: only stillness builds trust (CALM seconds of it); moving wears it down, rushing at it or a loud
-//   sound frightens it (the eyes shut and flinch away). 3 as trust grows the bravest eyes come first, circling
-//   wide, then closer. 4 full trust: it is your companion and follows you. 5 every time you stop moving it
-//   settles round you and grows. Gone for a while, it slowly forgets you and becomes scared again.
+// The story is told at the top of this file. Here: trust (0..1) toward its friend (always faces[0]), whether it
+// is their companion yet, how long they have stood still, how grown it is round them, and what it remembers.
 let trust = STORY ? Math.min(1, Math.max(0, opt('trust', 0))) : 1, trustNote = '', trustNoteAt = 0, frightAt = 0;
-let companion = trust >= 1, stillFor = 0, grow = 0;
-const brave = (e) => !STORY || e.brave < trust * 1.3 + 0.12;   // the bravest eyes come first
-const sz = (e) => e.s * (1 + GROW * grow * e.gath);             // grown round you when you stop
+let companion = trust >= 1, stillFor = 0, grow = 0, friend = null, mem = null, strangerNow = null;
+const braveLine = () => trust * 1.4 - 0.06;   // eyes braver than this come out: the bravest first, once you have been still a little
+const brave = (e) => !STORY || e.brave < braveLine();
+const sz = (e) => e.s * (1 + GROW * grow * e.gath) * e.ls;   // grown round you when you stop; ls: smaller while being born or dying
 function addTrust(d, why) {
   trust = constrain(trust + d, 0, 1);
   if (why && (abs(d) > 0.005 || millis() - trustNoteAt > 4000)) { trustNote = (d > 0 ? '+ ' : '− ') + why; trustNoteAt = millis(); }
@@ -1252,34 +1460,265 @@ function addTrust(d, why) {
 // pushed too hard: it loses trust, the eyes shut and flinch away, and it won't be scared again for a moment
 function fright(d, why, sound) {
   const now = millis();
-  if (companion || now - frightAt < 2500) return;   // a companion is not scared of you any more
-  frightAt = now; addTrust(-d, why);
+  if (now - frightAt < 2500) return;
+  if (companion) {   // a companion is not scared of you any more: a loud sound only makes it flinch for a moment
+    if (sound) { frightAt = now; eyes.forEach((e) => { if (random() < 0.5) e.hide = now + random(400, 1000); }); }
+    return;
+  }
+  frightAt = now; say.lastFright = now; say.frightSound = !!sound; addTrust(-d, why);
+  mood = min(1, mood + 0.06);   // every fright stays with it a while
   const p = faces[0];
   if (!sound) { startle.at = now / 1000; startle.x = p ? p.x : width / 2; startle.y = p ? p.y : height / 2; }
   eyes.forEach((e) => { e.hide = now + random(1200, 3500); });
 }
 function storyStep(dt) {
   if (!STORY) return;
-  const now = millis(), p = faces[0];
-  if (!p) {   // gone: it waits, shrinks back, and after a while forgets you
+  mood -= mood * dt / 1800;
+  const now = millis();
+  faces.forEach((q) => {   // how calm each person is: still time counts up, moving counts it down faster
+    if (now - q.since < 1500 || now - (q.jumpAt || -1e9) < 1000) return;   // just arrived or found again: the filters are still settling
+    const vx = q.fx.v(), vy = q.fy.v(), sp = sqrt(vx * vx + vy * vy);
+    const hw = max(0.1, q.w.x()) / 0.1;   // measured in head widths, so someone close to the camera isn't 'moving' when they sway
+    q.moving = lerp(q.moving || 0, constrain(((sp + abs(q.w.v()) * 2) / hw - 0.06) / 0.25, 0, 1), min(1, dt * 4));   // 0 = still, 1 = walking
+    q.calm = max(0, (q.calm || 0) + (q.moving < 0.15 ? dt : -2 * dt));
+  });
+  if (friend && !faces.includes(friend)) {
+    const gone = friend;
+    friend = null; stillFor = 0;
+    if (!faces.length) {   // its friend left an empty room: it watches them go, and keeps them in mind for a while
+      startFarewell(gone);
+      mem = { trust, companion, at: now, x: gone.x, w: gone.w.x() }; trust = 0;
+    }
+    else {   // others are still here: it turns to the calmest of them, trusting them as much as it saw them stay calm
+      const q = faces.reduce((a, b) => ((b.calm || 0) > (a.calm || 0) ? b : a));
+      friend = q; trust = min(0.8, (q.calm || 0) / CALM * 0.8); trustNote = 'its friend left: it turns to you'; trustNoteAt = now;
+    }
+    if (!friend || trust < 1) companion = false;
+  }
+  if (mem && now - mem.at > REMEMBER * 1000) mem = null;   // too long: forgotten
+  // the first person into the empty room, within the time it remembers, is greeted as the friend coming back
+  // (it can't tell faces apart: nothing about anyone is stored, it only remembers that someone was its friend)
+  // (it can't tell faces apart: someone who comes in from the side its friend left by, about as near, counts as
+  // them; anyone else means the friend is gone, and the story starts again with the newcomer)
+  const back = mem && faces.find((q) => q.since > mem.at);
+  if (back) {
+    if (faces.length === 1 && looksLikeFriend(back)) {
+      friend = back; trust = mem.trust; companion = mem.companion;
+      if (now - mem.at > 2000) greet(back);
+    }
+    mem = null;
+  }
+  if (!friend && faces.length) friend = faces[0];
+  // people who came with the friend, or who stayed calm for a while, are part of its pack: never strangers
+  faces.forEach((q) => { if (q !== friend && !q.pack && (abs(q.since - friend.since) < 4000 || q.calm > ACCEPT)) q.pack = true; });
+  if (friend && faces[0] !== friend) faces.splice(faces.indexOf(friend), 1), faces.unshift(friend);   // the friend comes first
+  strangerNow = findStranger();
+  const p = friend;
+  if (!p) {   // gone: it waits and shrinks back
     stillFor = 0; grow = max(0, grow - dt * 0.7);
-    if (now - seenAt > 20000) { trust = max(0, trust - dt * 0.01); if (trust < 0.6) companion = false; }
     return;
   }
-  if (now - p.since < 1500) return;   // just arrived: the filters are still settling
+  if (now - p.since < 1500 || now - (p.jumpAt || -1e9) < 1000) return;   // just arrived or found again: the filters are still settling
   const vx = p.fx.v(), vy = p.fy.v(), sp = sqrt(vx * vx + vy * vy), dw = p.w.v();
-  p.moving = lerp(p.moving || 0, constrain((sp + abs(dw) * 2 - 0.06) / 0.25, 0, 1), min(1, dt * 4));   // 0 = still, 1 = walking
   const still = p.moving < 0.15;
   stillFor = still ? stillFor + dt : 0;
   if (!companion) {
-    if (dw > 0.18) fright(0.25, 'you came at it too fast');
-    else if (sp > 0.9) fright(0.15, 'a sudden move');
-    if (stillFor > 1) addTrust(dt / CALM, 'you stayed still');   // a pause while walking doesn't count
-    else addTrust(-0.05 * p.moving * dt, 'you moved');
-    if (trust >= 1) { companion = true; trustNote = 'it trusts you: it will follow you'; trustNoteAt = now; }
+    // a fright needs a real rush (a moment of it, in head widths), not one jumpy look from the camera
+    const hw = max(0.1, p.w.x()) / 0.1, rush = dw / hw > 0.15 ? 1 : sp / hw > 0.75 ? 2 : 0;
+    p.rushFor = rush ? (p.rushFor || 0) + dt : 0;
+    if (p.rushFor > 0.15) { fright(rush === 1 ? 0.2 : 0.12, rush === 1 ? 'you came at it too fast' : 'a sudden move'); p.rushFor = 0; }
+    if (heard > 0.2) addTrust(-HUSH * sqrt(heard) * dt / CALM, 'a noise: it listens, wary');   // only quiet stillness earns trust; noise loses it, like moving
+    else if (stillFor > 1) addTrust(dt / CALM * (1 - 0.4 * MOOD * mood), 'you stayed still');   // a pause while walking doesn't count; slower on a bad day
+    else addTrust(-LOSE * sqrt(p.moving) * dt / CALM, 'you moved');   // until it trusts you fully, moving loses trust LOSE times as fast as stillness earns it (small moves count too)
+    if (trust >= 1) { companion = true; trustNote = 'it trusts you: it will follow you'; trustNoteAt = now; startPact(p); }
   }
   const want = companion ? constrain((stillFor - 1) / 5, 0, 1) : 0;   // you stop: after a second it settles and grows over 5 s
   grow = want > grow ? min(want, grow + dt * 0.25) : max(want, grow - dt * 0.8);   // and shrinks quickly to follow you again
+}
+
+// it knows you again: every eye opens at once, they hurry to you and blink hello, nearest first
+function greet(p) {
+  const now = millis(), t = now / 1000;
+  trustNote = 'it remembers you'; trustNoteAt = now; say.greeted = true;
+  eyes.forEach((e) => {
+    const d = dist(e.x, e.y, p.x, p.y) / width;
+    e.wakeAt = now; e.sleep = min(e.sleep, 0.3); e.hide = 0;
+    e.rushUntil = t + 2.5; e.blinkAt = t + 0.3 + d * 0.8; e.blinkDur = random(0.5, 0.7);
+  });
+}
+// the moment it trusts you (about 5 s): every eye closes and stays where it is, the breath stops; then they open,
+// nearest first, wider than ever, pupils large, with one deep breath; only then do they come to you
+const PACT = opt('pact', 1) > 0;
+let pactAt = -1e9, pactDone = -1e9, pactWide = 0;
+// the day's mood (-0.5 bold .. 1 wary): what happened with the last visitors stays with it for a while, fading
+// over about half an hour; the nightly fresh start begins a new day
+let mood = 0;
+const pactT = () => (millis() - pactAt) / 1000;
+function startPact(p) {
+  if (!PACT) return;
+  const now = millis();
+  pactAt = now;
+  mood = max(-0.5, mood - 0.2);   // and every friend makes it a little bolder
+  eyes.forEach((e) => {
+    const d = dist(e.x, e.y, p.x, p.y) / width;
+    e.hide = now + 1300 + d * 1500 + random(0, 200);   // shut together, open again one after another from you outward
+    e.blinkAt = 1e9;
+  });
+}
+function pactStep(dt) {
+  const t = pactT();
+  // wide eyes and large pupils: rise as they open, held a moment, then ease back over a few seconds
+  const want = t < 1.2 ? 0 : t < 6 ? sstep(1.2, 3.2, t) : 1 - sstep(6, 9, t);
+  pactWide = t > 9 || t < 0 ? 0 : want;
+  if (t > 4.5 && pactAt > pactDone) { pactDone = pactAt; eyes.forEach((e) => { e.blinkAt = millis() / 1000 + random(2, 6); e.rushUntil = millis() / 1000 + 2; }); }   // now they come
+}
+// the same side it left by (or the same spot, if it left from the middle), and a face of about the same size
+function looksLikeFriend(q) {
+  const side = (x) => (x < width / 3 ? -1 : x > width * 2 / 3 ? 1 : 0), s = side(mem.x);
+  const near = s === 0 ? abs(q.ax - mem.x) < width * 0.35 : side(q.ax) === s || abs(q.ax - mem.x) < width * 0.25;
+  return near && abs(q.aw - mem.w) < mem.w * 0.4;
+}
+
+// its friend has gone: every eye watches the place they left by, the closest companions drift a little after
+// them, then it lets out one long breath and they all blink slowly, and the room is quiet again
+let farewell = null;
+const farewellT = () => (farewell ? (millis() - farewell.at) / 1000 : 1e9);
+function startFarewell(p) {
+  const edge = p.x < width * 0.35 ? cell * 0.4 : p.x > width * 0.65 ? width - cell * 0.4 : p.x;   // out by the side, or straight back
+  farewell = { at: millis(), x: edge, y: constrain(p.y, height * 0.2, height * 0.8), close: companion || trust > 0.5, blinked: false };
+}
+function farewellStep() {
+  const t = farewellT();
+  if (!farewell || faces.length || t > 8) { farewell = faces.length ? null : farewell; return; }
+  if (t > 5.5 && !farewell.blinked) {
+    farewell.blinked = true;
+    const now = millis() / 1000;
+    eyes.forEach((e) => { if (e.sleep < 0.7) { e.blinkAt = now + random(0, 0.6); e.blinkDur = random(0.9, 1.3); } });
+  }
+}
+
+// the stranger: someone else who came later and hasn't settled yet, the one nearest to the friend
+function stranger() { return strangerNow; }
+function findStranger() {
+  const others = faces.slice(1).filter((q) => !q.pack);
+  if (!others.length) return null;
+  return others.reduce((a, q) => (abs(q.x - faces[0].x) < abs(a.x - faces[0].x) ? q : a));
+}
+// your companion guards you: about half its eyes keep watching the stranger; if the stranger comes close to you,
+// all of them do. Before that (no companion yet) a stranger only gets a look as they arrive
+function guardOf(e) {
+  const s = companion && faces.length > 1 && stranger();
+  if (!s) return null;
+  const close = abs(s.x - faces[0].x) < cell * 2.5;
+  return close || e.ear < 0.5 ? s : null;
+}
+
+// ---------- left alone for days (an installation) ----------
+// The mouse pointer hides when it stops moving; the screen is asked not to sleep; a camera that stops
+// (unplugged, frozen, taken by another app) is reopened; and once a night, with nobody there, the page
+// reloads itself so it runs for days without anyone touching it.
+const RELOAD_AT = opt('reload', 4);   // hour of the night to start afresh (24-hour clock; -1 = never)
+let pointerAt = 0, reloadTry = -1e9, wakeLock = null, camT = -1, camStuckSince = 0, camReopenAt = -1e9, camWorked = false;
+function keepAwake() {
+  if (!navigator.wakeLock || document.visibilityState !== 'visible' || wakeLock) return;
+  navigator.wakeLock.request('screen').then((l) => { wakeLock = l; l.addEventListener('release', () => { wakeLock = null; }); }).catch(() => {});
+}
+function watchdog() {
+  const now = millis();
+  keepAwake();
+  if (now - pointerAt > 3000) noCursor();
+  // the camera: once it has worked, frames must keep coming; if not for 8 s, reopen it (not more than every
+  // 30 s). Never before it first works, so a visitor isn't asked for the camera again and again
+  const v = cam && cam.elt, track = v && v.srcObject && v.srcObject.getVideoTracks()[0];
+  if (v) {
+    const ended = !track || track.readyState === 'ended';
+    if (v.readyState >= 2 && v.currentTime !== camT && !ended) { camT = v.currentTime; camStuckSince = now; camWorked = true; }
+    else if (camWorked && now - camStuckSince > 8000 && now - camReopenAt > 30000) {
+      camReopenAt = now; camStuckSince = now;
+      console.warn('camera stopped: reopening it');
+      try { v.srcObject.getTracks().forEach((t) => t.stop()); } catch (e) { /* already gone */ }
+      camT = -1;
+      cam.remove(); rvfc = false; openCamera();   // frames are then looked at from draw()
+    }
+  }
+  // the nightly fresh start: past the hour, running at least 12 h, and nobody there for a minute; only if it can
+  // start again: everything is kept in the browser (sw.js), or else the internet answers. If not, it keeps running
+  // and tries again in a minute
+  const d = new Date();
+  if (RELOAD_AT >= 0 && d.getHours() === RELOAD_AT && now > 12 * 3600 * 1000 && !faces.length && now - seenAt > 60000 && !recorder && now - reloadTry > 60000) {
+    reloadTry = now;
+    const online = () => fetch(MP + '/package.json', { cache: 'no-store' }).then((res) => { if (res.ok) location.reload(); }).catch(() => {});
+    if (window.caches) caches.match(MODEL).then((kept) => (kept ? location.reload() : online())).catch(online); else online();
+  }
+}
+function mouseMoved() { pointerAt = millis(); cursor(); }
+document.addEventListener('visibilitychange', keepAwake);
+
+// ---------- the narrator (words=1) ----------
+// Short lines at the bottom of the screen that tell the story and, at the same time, what to do next: each one
+// once per visitor, at the moment it matters, faded in and out, one at a time. lang=el for Greek; words=0: none.
+// If someone is stuck (moving or talking for a while and trust isn't growing), the advice comes back.
+const WORDS = opt('words', 1) > 0, LANG = Q.get('lang') === 'el' ? 'el' : 'en';
+const LINES = {
+  arrive: ['Something in the dark is watching you.', 'Κάτι στο σκοτάδι σε κοιτάζει.'],
+  afraid: ['It is afraid. Stand still.', 'Φοβάται. Μην κουνιέσαι.'],
+  noise: ['Shh. It is listening.', 'Σσσ. Ακούει.'],
+  fright: ['Too fast. It hides.', 'Πολύ απότομα. Κρύβεται.'],
+  loud: ['Too loud. It hides.', 'Πολύ δυνατά. Κρύβεται.'],
+  used: ['It is getting used to you.', 'Αρχίζει να σε συνηθίζει.'],
+  closer: ['Closer now. Don\'t move.', 'Πιο κοντά τώρα. Μην κουνιέσαι.'],
+  trusts: ['It trusts you. Walk, and it follows.', 'Σε εμπιστεύεται. Περπάτα, και θα σε ακολουθήσει.'],
+  grown: ['Stay, and it gathers its strength around you.', 'Μείνε, και μαζεύει τη δύναμή του γύρω σου.'],
+  guard: ['Someone else is here. It guards you.', 'Κάποιος άλλος είναι εδώ. Σε προστατεύει.'],
+  back: ['It remembers you.', 'Σε θυμάται.'],
+};
+const say = { said: new Set(), queue: [], now: null, at: 0, who: null, stuckSince: 0, trustAgo: 0, trustAt: 0, lastFright: 0, greeted: false };
+function tell(key, again) {
+  if ((!again && say.said.has(key)) || say.queue.includes(key) || (say.now === key)) return;
+  say.said.add(key); say.queue.push(key);
+}
+function narrate(dt) {
+  if (!WORDS || !STORY) return;
+  if (mic && mic.ac.state !== 'running') {   // the browser keeps the microphone off until a click: say so, faintly (a kiosk started with start_iris.bat never needs it)
+    const c = drawingContext; c.save(); c.font = '14px Georgia, serif'; c.textAlign = 'center'; c.fillStyle = 'rgba(222,214,204,0.35)';
+    c.fillText(LANG === 'el' ? 'Ένα κλικ, για να σε ακούει' : 'Click once, so it can hear you', width / 2, 24); c.restore();
+  }
+  const now = millis(), p = friend && faces.includes(friend) ? friend : null;
+  if (p !== say.who && p) { say.said = new Set(); say.queue = []; say.who = p; say.stuckSince = now; }   // a new visitor: the story from the start
+  if (p) {
+    const here = now - p.since;
+    if (say.greeted) { say.greeted = false; say.said = new Set(['arrive', 'afraid', 'used', 'closer']); tell('back'); }
+    if (here > 1000) tell('arrive');
+    if (!companion && here > 3500 && trust < 0.4) tell('afraid');   // what to do, as early as it can be read
+    if (!companion && p.moving > 0.5 && trust > 0.1 && now - (say.movedAt || 0) > 10000 && say.said.has('afraid')) { say.movedAt = now; tell('afraid', true); }   // losing trust by moving: say again what it needs
+    if (now - say.lastFright < 300) { say.lastFright = 0; say.now = say.frightSound ? 'loud' : 'fright'; say.at = now; }   // at once, over whatever was said
+    if (!companion && heard > 0.25 && here > 4000 && trust < 0.5) tell('noise');
+    if (!companion && heard > 0.4 && trust > 0.1 && now - (say.noiseAt || 0) > 10000 && say.said.has('noise')) { say.noiseAt = now; tell('noise', true); }   // losing trust to noise: say again
+    if (trust > 0.35 && !companion) tell('used');
+    if (trust > 0.7 && !companion) tell('closer');
+    if (companion) tell('trusts');
+    if (companion && grow > 0.8) tell('grown');
+    if (companion && stranger()) tell('guard');
+    // stuck: 20 s without trust growing while it is still afraid: say again what it needs
+    if (now - say.trustAt > 2500) { if (trust - say.trustAgo > 0.04 || companion) say.stuckSince = now; say.trustAgo = trust; say.trustAt = now; }
+    if (now - say.stuckSince > 20000) { say.stuckSince = now; tell(/noise/.test(trustNote) ? 'noise' : 'afraid', true); }
+  } else say.queue = [];
+  // one line at a time: faded in, held long enough to read, faded out; the next waits its turn, and a line the
+  // story has already moved past is dropped instead of said late
+  const stale = { afraid: companion || (trust > 0.45 && !(friend && friend.moving > 0.3)), noise: companion || (trust > 0.6 && heard < 0.3), used: trust > 0.75 || companion, closer: companion };
+  while (!say.now && say.queue.length) { const k = say.queue.shift(); if (!stale[k]) { say.now = k; say.at = now; } }
+  if (!say.now) return;
+  const t = (now - say.at) / 1000, words = LINES[say.now][LANG === 'el' ? 1 : 0], hold = 1.8 + words.length * 0.04;
+  if (t > hold + 1.6) { say.now = null; return; }
+  const a = 0.62 * min(sstep(0, 0.8, t), 1 - sstep(hold + 0.8, hold + 1.6, t));
+  const ctx = drawingContext, size = round(constrain(min(width, height) * 0.032, 15, 40));
+  ctx.save();
+  ctx.font = size + 'px Georgia, serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = size * 0.8;   // readable over an eye
+  ctx.fillStyle = 'rgba(222,214,204,' + a.toFixed(3) + ')';
+  ctx.fillText(words, width / 2, height - max(size * 1.6, height * 0.06));
+  ctx.restore();
 }
 
 // ---------- exhibition controls ----------
@@ -1292,7 +1731,7 @@ function keyPressed() {
     else { document.exitFullscreen(); cursor(); }
   }
   if (k === 's' && vig) drawingContext.drawImage(vig.elt, 0, 0, width, height);   // stills include it too
-  if (k === 's') saveCanvas('iris-grid-' + seed + '-' + frameCount, 'png');
+  if (k === 's') saveCanvas('iris-' + seed + '-' + frameCount, 'png');
   if (k === 'r') recolour();
   if (k === 'v') toggleRecording();
   if (k === 'd') showCam = !showCam;
@@ -1302,6 +1741,7 @@ function keyPressed() {
 let lastTap = -1e9;
 function mousePressed() {
   armSound();
+  if (KIOSK) return;   // visitors can't open it by accident
   if (millis() - lastTap < 400) { showCam = !showCam; lastTap = -1e9; } else lastTap = millis();
 }
 function armSound() {
@@ -1327,7 +1767,7 @@ function toggleRecording() {
   recorder.onstop = () => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(chunks, { type }));
-    a.download = 'iris-grid-' + seed + '-' + Date.now() + (type.includes('mp4') ? '.mp4' : '.webm');
+    a.download = 'iris-' + seed + '-' + Date.now() + (type.includes('mp4') ? '.mp4' : '.webm');
     a.click();
     recorder = null; recDot.style.display = 'none';
   };

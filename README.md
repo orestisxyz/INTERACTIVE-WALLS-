@@ -6,20 +6,47 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 
 | # | Work | What it does |
 |---|------|--------------|
-| 01 | [Iris](iris/) | A shy creature of eyes in the dark. It runs from you at first; stay still and it learns to trust you, then follows you and grows round you whenever you stop. |
+| 01 | [Iris](iris/) | A shy beast made of eyes in the dark. It runs from you at first; stand still and quiet and it learns to trust you, then follows you, guards you from strangers, and watches you go. |
 
 ## Iris
 
-**How it behaves.** Scared at first, the eyes hide at the edges and keep away, further the more you move, so chasing them drives them off. Only standing still earns their trust (rushing at them or a loud sound frightens them). As trust grows the bravest eyes come first, then the rest, circling closer. Once it trusts you it follows you, and every time you stop it settles round you and grows. Leave for a while and it slowly forgets you. `calm` sets the seconds of stillness it needs (default 12), `grow` how big it gets (default 0.8 = up to 1.8x), `trust=1` starts it tame, `story=0` turns the story off (it simply follows).
+**The story.** A narrator line at the bottom says what is happening and what to do (`lang=el` for Greek).
 
-- **Camera:** finds faces with MediaPipe (BlazeFace), on your device. No image leaves the browser; nothing is recorded or sent.
-- **Microphone:** only listens for loud sounds, which startle the eyes.
-- **Sound:** a breathing sound, which starts after the first click, tap or key.
-- **Keys:** F fullscreen, S save a still, R new colours, V record a video, D show what the camera sees and how much it trusts you, C calibrate.
-- **Calibrate for a wall:** if the camera is off to one side or far from the screen, press C and follow the words: stand in the middle, then at one side, then the other (a few seconds each). It is saved in that browser. Add `?calib=0` to the address to forget it.
-- **As many eyes as the device can hold:** it starts with the number that suits the screen, then adds eyes while the animation stays smooth and removes some if it starts to stutter. Each device remembers its number for next time. `eyes=20` fixes the count; `most` (default 120) and `minsize` (smallest room per eye in px, default 100) set the limits.
-- **Settings in the address**, for example `iris/?space=1.7&turn=45&tilt=25&sleep=20`: `space` (fewer eyes when higher), `around` (0 = they stay scattered), `turn` and `tilt` (degrees), `follow` (how much the whole eye turns with its gaze, 0 to 1), `sleep` (seconds before they fall asleep), `sound` (0 = no microphone), `seed` (same layout and colours every time). The top of `iris/sketch.js` lists the rest.
-- **Needs:** https or localhost for the camera; an internet connection on first load (p5.js and the face model come from CDNs).
+1. **Afraid.** When you arrive the eyes run to the edges, look away and steal glances. Moving or talking makes it worse: until it trusts you, moving and noise take trust away three times faster than stillness builds it. A rush, a bang or a clap frightens it.
+2. **Trust.** Stand still and quiet. The bravest eyes come closer first. Full trust takes about 16 s of calm.
+3. **The pact.** At full trust every eye shuts, then they open wide, nearest first, with one deep breath.
+4. **Companion.** It follows you. Stop, and it gathers round you and grows. If it hears something, it keeps watch for you.
+5. **A stranger.** Someone else arrives, and it guards you until they have stayed calm for a while. People who come with you are part of the pack.
+6. **Leaving.** It watches the side you left by and lets out a long breath. Come back the same way within 30 s and it greets you. Anyone else starts the story afresh. It can't recognise faces: it only guesses from where you come in and how near you are.
+
+**Around the story.** Each eye is a lost soul that lives a few minutes, fades, and is born again somewhere else. The beast also has a mood for the day: frights make it shyer for the next visitors, friends make it bolder, and it settles over about half an hour.
+
+- **Camera:** finds faces with MediaPipe on this device. No image leaves the browser, nothing is recorded or sent, and no face is recognised.
+- **Microphone:** listens to the room's loudness only (noise, claps, bangs).
+- **Sound:** a breathing voice. In a normal browser it starts after the first click, tap or key; the kiosk start file needs no click.
+- **Keys:** F fullscreen, S save a still, R new colours, V record a video, D what the camera sees (faces, trust, fps, eye count, mood), C calibrate for a wall.
+- **Calibrate for a wall:** if the camera is off to one side or far from the screen, press C and follow the words (middle, one side, the other). It is saved in that browser. `?calib=0` forgets it.
+- **As many eyes as the device can hold**, up to 24 by default: it adds eyes while the animation stays smooth and removes some if it stutters, and remembers the number per screen.
+- **Works offline after the first start:** `sw.js` keeps a copy of p5, the face model and the sketch in the browser.
+- **Settings in the address**, for example `iris/?lang=el&calm=20`:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `calm` | 16 | seconds of stillness for full trust |
+| `lose` / `hush` | 3 / 3 | how much faster moving / noise take trust away than stillness builds it |
+| `shy`, `snap`, `tempo` | 1, 1.4, 0.6 | how far it runs, how fast it comes and goes, how fast its small glances are |
+| `grow` | 0.8 | how much it grows round you (0.8 = up to 1.8x) |
+| `accept`, `remember` | 8, 30 | seconds before a stranger is accepted; seconds it remembers you |
+| `pact`, `mood`, `story` | 1, 1, 1 | the trust moment; the day's mood; 0 turns each off (`story=0`: it simply follows) |
+| `trust` | 0 | `trust=1` starts it tame |
+| `words`, `lang` | 1, en | narrator lines; `lang=el` for Greek |
+| `most`, `eyes`, `life` | 24, adaptive, 60-360 | most eyes; a fixed count; seconds each soul lives (`life=0` for ever) |
+| `sound`, `rhythm`, `breath` | 1, 1, 1 | microphone; claps and beats; the breathing voice |
+| `kiosk`, `reload`, `dpr`, `offline` | 0, 4, 2, 1 | installation: no double-click camera view; nightly fresh start hour (-1 = never); screen sharpness; offline copy |
+
+The top of `iris/sketch.js` lists the rest. **Installing it for days:** see [iris/kiosk/SETUP_WINDOWS.md](iris/kiosk/SETUP_WINDOWS.md), the start file `iris/kiosk/start_iris.bat`, and a wall label draft in `iris/kiosk/WALL_LABEL.md`.
+
+**Needs:** https or localhost for the camera, and internet the first time it starts.
 
 ## Run it locally
 
