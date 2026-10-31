@@ -12,14 +12,14 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 
 **The story.** A narrator line at the bottom says what is happening and what to do (`lang=el` for Greek).
 
-1. **Afraid.** When you arrive the eyes run to the edges, look away and steal glances. Moving or talking makes it worse: until it trusts you, moving and noise take trust away three times faster than stillness builds it. A rush, a bang or a clap frightens it.
+1. **Afraid.** When you arrive the eyes run to the edges, look away and steal glances. Moving or talking makes it worse: until it trusts you, moving and noise take trust away three times faster than stillness builds it. A rush or a clap frightens it (a gasp, the eyes shut); a loud bang makes every eye vanish into the dark, and they come back slowly, the bravest first.
 2. **Trust.** Stand still and quiet. The bravest eyes come closer first. Full trust takes about 16 s of calm.
 3. **The pact.** At full trust every eye shuts, then they open wide, nearest first, with one deep breath.
-4. **Companion.** It follows you. Stop, and it gathers round you and grows. If it hears something, it keeps watch for you.
+4. **Companion.** It follows you. Stop, and it gathers round you and grows, humming softly. If it hears something, it keeps watch for you; a loud bang still startles it a little, but it stays. Stay still for a minute and it falls asleep beside you, one eye now and then checking you are still there.
 5. **A stranger.** Someone else arrives, and it guards you until they have stayed calm for a while. People who come with you are part of the pack.
-6. **Leaving.** It watches the side you left by and lets out a long breath. Come back the same way within 30 s and it greets you. Anyone else starts the story afresh. It can't recognise faces: it only guesses from where you come in and how near you are.
+6. **Leaving.** Out of view for 6 s, you are gone: it watches the side you left by and lets out a long breath. Come back the same way within 30 s and it greets you. Anyone else starts the story afresh. It can't recognise faces: it only guesses from where you come in and how near you are.
 
-**Around the story.** Each eye is a lost soul that lives a few minutes, fades, and is born again somewhere else. The beast also has a mood for the day: frights make it shyer for the next visitors, friends make it bolder, and it settles over about half an hour.
+**Around the story.** Each eye is a lost soul that lives a few minutes, fades, and is born again somewhere else; the eyes near it turn to watch it go. The beast also has a mood for the day: frights make it shyer for the next visitors, friends make it bolder, and it settles over about half an hour.
 
 - **Camera:** finds faces with MediaPipe on this device. No image leaves the browser, nothing is recorded or sent, and no face is recognised.
 - **Microphone:** listens to the room's loudness only (noise, claps, bangs).
@@ -36,7 +36,9 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 | `lose` / `hush` | 3 / 3 | how much faster moving / noise take trust away than stillness builds it |
 | `shy`, `snap`, `tempo` | 1, 1.4, 0.6 | how far it runs, how fast it comes and goes, how fast its small glances are |
 | `grow` | 0.8 | how much it grows round you (0.8 = up to 1.8x) |
-| `accept`, `remember` | 8, 30 | seconds before a stranger is accepted; seconds it remembers you |
+| `accept`, `hold`, `remember` | 8, 6, 30 | seconds before a stranger is accepted; seconds out of view before you count as gone; seconds it remembers you |
+| `rest` | 60 | seconds of stillness as companion before it sleeps beside you (0 = never) |
+| `gasp`, `hum`, `mourn` | 1, 1, 1 | the gasp on a fright; the hum round you; eyes watching a soul go (0 turns each off) |
 | `pact`, `mood`, `story` | 1, 1, 1 | the trust moment; the day's mood; 0 turns each off (`story=0`: it simply follows) |
 | `trust` | 0 | `trust=1` starts it tame |
 | `words`, `lang` | 1, en | narrator lines; `lang=el` for Greek |
