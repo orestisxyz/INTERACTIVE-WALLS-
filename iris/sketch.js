@@ -346,13 +346,13 @@ function naturalPalette() {
 // (also different from the palettes of the eyes already on screen, when eyes are added on a resize)
 function naturalPalettes(n, existing = []) {
   const cands = Array.from({ length: 160 + 4 * n }, naturalPalette);
-  const key = (p) => { const m = [0, 0, 0]; [1, 2, 3, 4, 5].forEach((k) => { m[0] += p.ramp[k][0]; m[1] += p.ramp[k][1]; m[2] += p.ramp[k][2]; }); return m.map((v) => v / 5); };
-  const keys = cands.map(key), dist = (u, v) => sqrt(sq(u[0] - v[0]) + sq(u[1] - v[1]) * 1.3 + sq(u[2] - v[2]));
-  const have = existing.map(key), picked = [];
+  const tone = (p) => { const m = [0, 0, 0]; [1, 2, 3, 4, 5].forEach((k) => { m[0] += p.ramp[k][0]; m[1] += p.ramp[k][1]; m[2] += p.ramp[k][2]; }); return m.map((v) => v / 5); };
+  const keys = cands.map(tone), apart = (u, v) => sqrt(sq(u[0] - v[0]) + sq(u[1] - v[1]) * 1.3 + sq(u[2] - v[2]));
+  const have = existing.map(tone), picked = [];
   if (!have.length) { picked.push(floor(random(cands.length))); have.push(keys[picked[0]]); }
   range(n - picked.length).forEach(() => {
     let best = -1, bi = 0;
-    cands.forEach((_, i) => { const d = min(...have.map((h) => dist(keys[i], h))); if (d > best) { best = d; bi = i; } });
+    cands.forEach((_, i) => { const d = Math.min(...have.map((h) => apart(keys[i], h))); if (d > best) { best = d; bi = i; } });
     picked.push(bi); have.push(keys[bi]);
   });
   return shuffle(picked.map((i) => cands[i]));
@@ -481,8 +481,8 @@ function relax() {
       const A = 0.92 * bs * (a.s + b.s), B = 0.6 * bs * (a.s + b.s);
       const dx = b.x - a.x, dy = b.y - a.y, d = sqrt(sq(dx / A) + sq(dy / B));
       if (d >= 1.05 || d === 0) return;
-      const push = (1.05 - d) * 0.5, ux = dx / A / d, uy = dy / B / d;
-      a.x -= ux * push * A * 0.5; a.y -= uy * push * B * 0.5; b.x += ux * push * A * 0.5; b.y += uy * push * B * 0.5;
+      const shove = (1.05 - d) * 0.5, ux = dx / A / d, uy = dy / B / d;
+      a.x -= ux * shove * A * 0.5; a.y -= uy * shove * B * 0.5; b.x += ux * shove * A * 0.5; b.y += uy * shove * B * 0.5;
     }));
     eyes.forEach((e) => { e.x = constrain(e.x, cell * 0.1, width - cell * 0.1); e.y = constrain(e.y, cell * 0.1, height - cell * 0.1); });
   });
@@ -624,8 +624,8 @@ function drawFrame() {
     const g = gazeTarget(e, t, dt);
     // aim from a point between this eye and the screen centre: mostly parallel gaze, a little convergence
     const par = g.own ? 0 : lerp(PARALLEL, 0.4, e.gath);   // on the screen itself: from the eye; gathered round you: they converge a little
-    const vx = g.x - lerp(e.x, width / 2, par), vy = g.y - lerp(e.y, height / 2, par), dist = sqrt(vx * vx + vy * vy);
-    const tth = min(radians(MAX_TURN), atan2(dist, g.z)), tgx = dist > 0 ? vx / dist * tth : 0, tgy = dist > 0 ? vy / dist * tth * 0.75 : 0;   // eyes turn less up/down than sideways
+    const vx = g.x - lerp(e.x, width / 2, par), vy = g.y - lerp(e.y, height / 2, par), far = sqrt(vx * vx + vy * vy);
+    const tth = min(radians(MAX_TURN), atan2(far, g.z)), tgx = far > 0 ? vx / far * tth : 0, tgy = far > 0 ? vy / far * tth * 0.75 : 0;   // eyes turn less up/down than sideways
     const dx = tgx - e.gx, dy = tgy - e.gy, err = sqrt(dx * dx + dy * dy);
     // moving like a real eye, but without steps: a critically damped spring (smooth speed, no overshoot) that is
     // soft while it follows you (pursuit) and much stiffer for a big change of target (a quick saccade)
@@ -807,8 +807,8 @@ function separate() {
     const A = 0.92 * bs * (sz(a) + sz(b)), B = 0.6 * bs * (sz(a) + sz(b));
     const dx = b.x - a.x, dy = b.y - a.y, d = sqrt(sq(dx / A) + sq(dy / B));
     if (d >= 1 || d === 0) return;
-    const push = (1 - d) * 0.25, ux = dx / A / d, uy = dy / B / d;
-    a.x -= ux * push * A; a.y -= uy * push * B; b.x += ux * push * A; b.y += uy * push * B;
+    const shove = (1 - d) * 0.25, ux = dx / A / d, uy = dy / B / d;
+    a.x -= ux * shove * A; a.y -= uy * shove * B; b.x += ux * shove * A; b.y += uy * shove * B;
   }));
 }
 
@@ -1132,14 +1132,14 @@ async function startTracking() {
 // which part of the camera image to search: the whole frame, or a 2x zoom. The face model only finds faces
 // up to about 2 m in the whole frame, so when it finds nobody the next looks sweep zoomed left, centre and right,
 // and a zoom follows people who are only found that way (every 4th look still checks the whole frame).
-const FULL = { x: 0, y: 0, s: 1 }, HUNT = [{ x: 0.25, y: 0.2, s: 0.5 }, { x: 0, y: 0.2, s: 0.5 }, { x: 0.5, y: 0.2, s: 0.5 }];
-let zoom = null, hunt = 0, detN = 0, lastFound = [], lastCrop = FULL, showCam = false;
+const WHOLE = { x: 0, y: 0, s: 1 }, HUNT = [{ x: 0.25, y: 0.2, s: 0.5 }, { x: 0, y: 0.2, s: 0.5 }, { x: 0.5, y: 0.2, s: 0.5 }];
+let zoom = null, hunt = 0, detN = 0, lastFound = [], lastCrop = WHOLE, showCam = false;
 
 function detectFaces(v) {
   const vw = v.videoWidth || 640, vh = v.videoHeight || 480, port = vh > vw;   // phones in portrait give a tall image
   const L = BLINK_BACK ? 320 : 160, S = L * 3 / 4, SW = port ? S : L, SH = port ? L : S;
   const wk = port ? vw / vh : 1;   // face width as a fraction of the long side, so distance reads the same both ways
-  const c = zoom && ++detN % 4 ? zoom : FULL;
+  const c = zoom && ++detN % 4 ? zoom : WHOLE;
   if (!small || small.width !== SW) { small = document.createElement('canvas'); small.width = SW; small.height = SH; }
   small.getContext('2d').drawImage(v, c.x * vw, c.y * vh, c.s * vw, c.s * vh, 0, 0, SW, SH);
   let found;
@@ -1167,7 +1167,7 @@ function detectFaces(v) {
     fs.forEach((f) => { mx += f.fx / fs.length; my += f.fy / fs.length; });
     return { x: constrain(mx - 0.25, 0, 0.5), y: constrain(my - 0.25, 0, 0.5), s: 0.5, track: true };
   };
-  if (c === FULL) {
+  if (c === WHOLE) {
     if (found.length) zoom = found.every((f) => f.w < 0.1) ? zoomOn(found) : null;   // everyone small = far: zoom in on them
     else if (!zoom || !zoom.track) zoom = HUNT[hunt++ % 3];                       // nobody: search zoomed next
   } else if (found.length) zoom = zoomOn(found);                                   // keep the zoom on them as they move
@@ -1320,14 +1320,14 @@ function runCalib() {
 // without lag; it also gives a speed, used to predict where you are between camera checks
 function euro(minCut, beta) {
   let x = null, dx = 0, tp = 0;
-  const alpha = (cut, dt) => { const r = TWO_PI * cut * dt; return r / (r + 1); };
+  const blendK = (cut, dt) => { const r = TWO_PI * cut * dt; return r / (r + 1); };
   return {
     x: () => x, v: () => dx,
     f: (val, t) => {
       if (x === null) { x = val; tp = t; return x; }
       const dt = max(0.001, t - tp); tp = t;
-      dx += alpha(1, dt) * ((val - x) / dt - dx);
-      x += alpha(minCut + beta * abs(dx), dt) * (val - x);
+      dx += blendK(1, dt) * ((val - x) / dt - dx);
+      x += blendK(minCut + beta * abs(dx), dt) * (val - x);
       return x;
     },
   };
@@ -1723,7 +1723,7 @@ document.addEventListener('visibilitychange', keepAwake);
 // once per visitor, at the moment it matters, faded in and out, one at a time. lang=el for Greek; words=0: none.
 // If someone is stuck (moving or talking for a while and trust isn't growing), the advice comes back.
 const WORDS = opt('words', 1) > 0, LANG = Q.get('lang') === 'el' ? 'el' : 'en';
-const LINES = {
+const SAYINGS = {
   arrive: ['Something in the dark is watching you.', 'Κάτι στο σκοτάδι σε κοιτάζει.'],
   afraid: ['It is afraid. Stand still.', 'Φοβάται. Μην κουνιέσαι.'],
   noise: ['Shh. It is listening.', 'Σσσ. Ακούει.'],
@@ -1739,9 +1739,9 @@ const LINES = {
   sleeps: ['It sleeps beside you. Move gently.', 'Κοιμάται δίπλα σου. Κινήσου απαλά.'],
 };
 const say = { said: new Set(), queue: [], now: null, at: 0, who: null, stuckSince: 0, trustAgo: 0, trustAt: 0, lastFright: 0, greeted: false };
-function tell(key, again) {
-  if ((!again && say.said.has(key)) || say.queue.includes(key) || (say.now === key)) return;
-  say.said.add(key); say.queue.push(key);
+function tell(what, again) {
+  if ((!again && say.said.has(what)) || say.queue.includes(what) || (say.now === what)) return;
+  say.said.add(what); say.queue.push(what);
 }
 function narrate(dt) {
   if (!WORDS || !STORY) return;
@@ -1775,7 +1775,7 @@ function narrate(dt) {
   const stale = { sleeps: rest < 0.3, afraid: companion || (trust > 0.45 && !(friend && friend.moving > 0.3)), noise: companion || (trust > 0.6 && heard < 0.3), used: trust > 0.75 || companion, closer: companion };
   while (!say.now && say.queue.length) { const k = say.queue.shift(); if (!stale[k]) { say.now = k; say.at = now; } }
   if (!say.now) return;
-  const t = (now - say.at) / 1000, words = LINES[say.now][LANG === 'el' ? 1 : 0], hold = 1.8 + words.length * 0.04;
+  const t = (now - say.at) / 1000, words = SAYINGS[say.now][LANG === 'el' ? 1 : 0], hold = 1.8 + words.length * 0.04;
   if (t > hold + 1.6) { say.now = null; return; }
   const a = 0.62 * min(sstep(0, 0.8, t), 1 - sstep(hold + 0.8, hold + 1.6, t));
   const ctx = drawingContext, size = round(constrain(min(width, height) * 0.032, 15, 40));
