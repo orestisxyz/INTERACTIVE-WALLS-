@@ -9,7 +9,7 @@
 5. **No pop-ups.** Settings > System > Focus assist: Alarms only. Close or uninstall apps that show notifications.
 6. **Camera access.** Settings > Privacy > Camera: allow apps and desktop apps. Same for Microphone. Don't open other apps that use the camera (Teams, Zoom, Camera app) while it runs.
 7. **Optional, to restart by itself after a power cut:** in the BIOS, set "AC power recovery" to On, and let Windows sign in without a password (Win+R, `netplwiz`).
-8. **Language.** The words start in Greek (`lang=el`); for another first language change it to `lang=en`, `lang=hu` or `lang=es` in the address inside the file. Visitors can switch with the faint ΕΛ EN HU ES in the top-right corner (with a mouse or a touch screen); a minute after the last visitor leaves, it goes back to the first language.
+8. **Language.** The words start in English (`lang=en`); for another first language change it to `lang=el` (Greek), `lang=hu` or `lang=es` in the address inside the file. Visitors can switch with the faint ΕΛ EN HU ES in the top-right corner (with a mouse or a touch screen); a minute after the last visitor leaves, it goes back to the first language.
 
 ## The room
 

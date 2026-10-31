@@ -28,7 +28,7 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 - **Calibrate for a wall:** if the camera is off to one side or far from the screen, press C and follow the words (middle, one side, the other). It is saved in that browser. `?calib=0` forgets it.
 - **As many eyes as the device can hold**, up to 24 by default: it adds eyes while the animation stays smooth and removes some if it stutters, and remembers the number per screen.
 - **Works offline after the first start:** `sw.js` keeps a copy of p5, the face model and the sketch in the browser.
-- **Settings in the address**, for example `iris/?lang=en&calm=20`:
+- **Settings in the address**, for example `iris/?lang=el&calm=20`:
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -41,7 +41,7 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 | `gasp`, `hum`, `mourn` | 1, 1, 1 | the gasp on a fright; the hum round you; eyes watching a soul go (0 turns each off) |
 | `pact`, `mood`, `story` | 1, 1, 1 | the trust moment; the day's mood; 0 turns each off (`story=0`: it simply follows) |
 | `trust` | 0 | `trust=1` starts it tame |
-| `words`, `lang` | 1, el | narrator lines; the first language: `el` Greek, `en` English, `hu` Hungarian, `es` Spanish (with `kiosk=1` it returns to it after a minute with nobody there) |
+| `words`, `lang` | 1, en | narrator lines; the first language: `en` English, `el` Greek, `hu` Hungarian, `es` Spanish (with `kiosk=1` it returns to it after a minute with nobody there) |
 | `most`, `eyes`, `life` | 24, adaptive, 60-360 | most eyes; a fixed count; seconds each soul lives (`life=0` for ever) |
 | `sound`, `rhythm`, `breath` | 1, 1, 1 | microphone; claps and beats; the breathing voice |
 | `reverb`, `stereo`, `voices` | 1, 1, 1 | the room's echo (2 = twice as much); sounds from their side; the souls' voices (0.5 = half as loud). 0 turns each off |

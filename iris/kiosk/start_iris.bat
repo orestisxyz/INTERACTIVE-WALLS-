@@ -4,10 +4,10 @@ rem Double-click to start. If the browser closes or crashes, it opens again afte
 rem To stop it: Alt+F4, then close this black window within 5 seconds.
 rem To start it when Windows starts, put a shortcut to this file in the Startup folder
 rem (press Win+R, type shell:startup, press Enter).
-rem Settings go in the address below: lang=el Greek words first (en English, hu Hungarian, es Spanish; visitors
+rem Settings go in the address below: lang=en English words first (el Greek, hu Hungarian, es Spanish; visitors
 rem can switch in the top-right corner), kiosk=1 visitors can't open the camera view. For a busy, talking opening night add &hush=1 (or &sound=0 in a very loud room).
 
-set "URL=https://orestisxyz.github.io/INTERACTIVE-WALLS-/iris/?lang=el&kiosk=1"
+set "URL=https://orestisxyz.github.io/INTERACTIVE-WALLS-/iris/?lang=en&kiosk=1"
 set "PROFILE=%LOCALAPPDATA%\IrisKiosk"
 
 set "BROWSER=%ProgramFiles%\Google\Chrome\Application\chrome.exe"

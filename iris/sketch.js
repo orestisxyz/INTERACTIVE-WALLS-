@@ -32,7 +32,7 @@
 // Installation: kiosk/start_iris.bat and kiosk/SETUP_WINDOWS.md. sw.js keeps a copy of everything in the
 //   browser, so it starts without internet after the first time.
 // URL settings (all optional), story: calm=16 lose=3 hush=3 shy=1 snap=1.4 tempo=0.6 grow=0.8 trust=0 pact=1
-//   accept=8 hold=6 remember=30 mood=1 rest=60 gasp=1 hum=1 mourn=1 words=1 lang=el (el|en|hu|es)
+//   accept=8 hold=6 remember=30 mood=1 rest=60 gasp=1 hum=1 mourn=1 words=1 lang=en (en|el|hu|es)
 // eyes: most=24 eyes=N (fixed) minsize=100 size=260 space=1.7 life=60-360 seed=N layout=scatter|grid
 // look: turn=45 tilt=25 follow=0.55 parallel=0.8 gain=1.6 dist=0.45 ripple=0.15 around=1
 // room: sound=1 rhythm=1 motion=0 blink=0 breath=1 reverb=1 stereo=1 voices=1 quiet=1 sleep=20 gpu=0
@@ -1839,12 +1839,12 @@ document.addEventListener('visibilitychange', keepAwake);
 // ---------- the narrator (words=1) ----------
 // Short lines at the bottom of the screen that tell the story and, at the same time, what to do next: each one
 // once per visitor, at the moment it matters, faded in and out, one at a time. In Greek, English, Hungarian and
-// Spanish: lang=el|en|hu|es chooses the first one, and visitors can change it with the faint ΕΛ EN HU ES in the top-right corner
+// Spanish: lang=en|el|hu|es chooses the first one (English if not given), and visitors can change it with the faint ΕΛ EN HU ES in the top-right corner
 // (or the L key). words=0: none.
 // If someone is stuck (moving or talking for a while and trust isn't growing), the advice comes back.
 const WORDS = opt('words', 1) > 0;
 const LANGS = ['en', 'el', 'hu', 'es'], LANG_NAMES = ['EN', 'ΕΛ', 'HU', 'ES'], LANG_ORDER = [1, 0, 2, 3];   // the order of the words in each line; the switch shows ΕΛ EN HU ES
-const LANG0 = LANGS.includes(Q.get('lang')) ? LANGS.indexOf(Q.get('lang')) : 1;   // Greek unless lang= says otherwise
+const LANG0 = LANGS.includes(Q.get('lang')) ? LANGS.indexOf(Q.get('lang')) : 0;   // English unless lang= says otherwise
 let lang = LANG0, langBox = [], langSeen = 0;
 const SAYINGS = {   // [English, Greek, Hungarian, Spanish]
   arrive: ['Something in the dark is watching you.', 'Κάτι στο σκοτάδι σε κοιτάζει.', 'Valami a sötétben figyel téged.', 'Algo en la oscuridad te está mirando.'],
