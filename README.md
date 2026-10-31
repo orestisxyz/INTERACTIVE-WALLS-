@@ -60,3 +60,9 @@ Then open http://localhost:8000/iris/ and allow the camera.
 ## Adding a work
 
 Make a folder (`02-name/`) with its own `index.html`, then add a line to the list in `index.html` and to the table above.
+
+## Licence
+
+The code is open: MIT licence (see [LICENSE](LICENSE)). Learn from it, take techniques, build your own things with it.
+
+The artworks are not: the works themselves (Iris as an artwork, its name, story, narrator texts, look and sound, and any exhibition of it) are © 2026 Orestis Dimopoulos (ORE.XYZ), all rights reserved. To show a work, get in touch through [orexyz.com](https://orexyz.com).
