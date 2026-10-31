@@ -9,6 +9,8 @@
 <script src="https://cdn.jsdelivr.net/npm/p5@1.11.1/lib/p5.min.js"></script>
 </head>
 <body>
-<script src="sketch.js"></script>
+<!-- always the newest sketch when online: its address changes on every start, so no cache can keep an old one
+     (offline, sw.js gives its kept copy) -->
+<script>document.write('<script src="sketch.js?v=' + Date.now() + '"><\/script>');</script>
 </body>
 </html>

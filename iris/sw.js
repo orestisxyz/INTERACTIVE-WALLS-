@@ -27,8 +27,9 @@ self.addEventListener('fetch', (ev) => {
   const req = ev.request;
   if (req.method !== 'GET' || !req.url.startsWith('http')) return;
   const own = new URL(req.url).origin === self.location.origin;
-  if (own) {   // the work itself: fresh when possible, the kept copy when offline
-    ev.respondWith(fetch(req).then((res) => {
+  if (own) {   // the work itself: fresh when possible (asking the server, not the browser's short-term cache, so an
+    // update shows on the next reload), the kept copy when offline
+    ev.respondWith(fetch(req, { cache: 'no-cache' }).then((res) => {
       if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
       return res;
     }).catch(() => caches.match(req, { ignoreSearch: true })));
