@@ -19,11 +19,11 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 5. **A stranger.** Someone else arrives, and it guards you until they have stayed calm for a while. People who come with you are part of the pack.
 6. **Leaving.** Out of view for 6 s, you are gone: it watches the side you left by and lets out a long breath. Come back the same way within 30 s and it greets you. Anyone else starts the story afresh. It can't recognise faces: it only guesses from where you come in and how near you are.
 
-**Around the story.** Each eye is a lost soul that lives a few minutes, fades, and is born again somewhere else; the eyes near it turn to watch it go. The beast also has a mood for the day: frights make it shyer for the next visitors, friends make it bolder, and it settles over about half an hour.
+**Around the story.** Each eye is a lost soul that lives a few minutes, fades, and is born again somewhere else; the eyes near it turn to watch it go. Each soul has a voice of its own: a soft bing in its own note when it blinks, that note when it is born, and a whisper when it dies. The beast also has a mood for the day: frights make it shyer for the next visitors, friends make it bolder, and it settles over about half an hour.
 
 - **Camera:** finds faces with MediaPipe on this device. No image leaves the browser, nothing is recorded or sent, and no face is recognised.
 - **Microphone:** listens to the room's loudness only (noise, claps, bangs).
-- **Sound:** a breathing voice. In a normal browser it starts after the first click, tap or key; the kiosk start file needs no click.
+- **Sound:** a breathing voice, the souls' small voices, all ringing in a large dark room (an echo made in code) and coming from where they happen on the screen (left or right speaker). Best on speakers or headphones: laptop speakers lose the low tones. In a normal browser it starts after the first click, tap or key; the kiosk start file needs no click.
 - **Keys:** F fullscreen, S save a still, R new colours, V record a video, D what the camera sees (faces, trust, fps, eye count, mood), C calibrate for a wall.
 - **Calibrate for a wall:** if the camera is off to one side or far from the screen, press C and follow the words (middle, one side, the other). It is saved in that browser. `?calib=0` forgets it.
 - **As many eyes as the device can hold**, up to 24 by default: it adds eyes while the animation stays smooth and removes some if it stutters, and remembers the number per screen.
@@ -44,6 +44,7 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 | `words`, `lang` | 1, en | narrator lines; `lang=el` for Greek |
 | `most`, `eyes`, `life` | 24, adaptive, 60-360 | most eyes; a fixed count; seconds each soul lives (`life=0` for ever) |
 | `sound`, `rhythm`, `breath` | 1, 1, 1 | microphone; claps and beats; the breathing voice |
+| `reverb`, `stereo`, `voices` | 1, 1, 1 | the room's echo (2 = twice as much); sounds from their side; the souls' voices (0.5 = half as loud). 0 turns each off |
 | `kiosk`, `reload`, `dpr`, `offline` | 0, 4, 2, 1 | installation: no double-click camera view; nightly fresh start hour (-1 = never); screen sharpness; offline copy |
 
 The top of `iris/sketch.js` lists the rest. **Installing it for days:** see [iris/kiosk/SETUP_WINDOWS.md](iris/kiosk/SETUP_WINDOWS.md), the start file `iris/kiosk/start_iris.bat`, and a wall label draft in `iris/kiosk/WALL_LABEL.md`.

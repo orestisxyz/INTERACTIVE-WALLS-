@@ -14,7 +14,9 @@
 //   breath. Come back the same way within `remember` seconds and it greets you with your trust kept; anyone else
 //   starts the story afresh
 // Around it: each eye is a "lost soul" that lives a while (`life` seconds), fades, and is born again elsewhere
-// (the eyes near it turn to watch it go, and the breath catches: `mourn`); a fright makes it gasp (`gasp`);
+// (the eyes near it turn to watch it go, and the breath catches: `mourn`); each soul has a voice of its own: a
+// bing when it blinks, its note when it is born, a whisper when it dies (`voices`); all its sounds ring in a large
+// dark room (`reverb`) and come from where they happen (`stereo`); a fright makes it gasp (`gasp`);
 // the day's mood (frights make it shyer for the next visitors, friends make it bolder); a narrator line at the
 // bottom says what is happening and what to do (`words`, `lang=el` for Greek).
 //
@@ -32,7 +34,7 @@
 //   accept=8 hold=6 remember=30 mood=1 rest=60 gasp=1 hum=1 mourn=1 words=1 lang=en
 // eyes: most=24 eyes=N (fixed) minsize=100 size=260 space=1.7 life=60-360 seed=N layout=scatter|grid
 // look: turn=45 tilt=25 follow=0.55 parallel=0.8 gain=1.6 dist=0.45 ripple=0.15 around=1
-// room: sound=1 rhythm=1 motion=0 blink=0 breath=1 quiet=1 sleep=20 gpu=0
+// room: sound=1 rhythm=1 motion=0 blink=0 breath=1 reverb=1 stereo=1 voices=1 quiet=1 sleep=20 gpu=0
 // installation: kiosk=0 reload=4 dpr=2 offline=1 calib=0 (forgets the calibration)
 
 // Palettes measured from the five reference photos (colour values only; no image data is used).
@@ -122,6 +124,9 @@ const REST = opt('rest', 60);    // seconds of stillness as your companion befor
 const GASP = opt('gasp', 1) > 0;   // a sharp breath in when it is frightened
 const HUM = opt('hum', 1) > 0;     // a low warm hum while it is gathered round you
 const MOURN = opt('mourn', 1) > 0;   // when a soul dies, the eyes near it turn to it and the breath dips
+const REVERB = opt('reverb', 1);   // the room's echo: its sounds ring in a large dark space (0 = dry, 2 = twice as much)
+const STEREO = opt('stereo', 1) > 0;   // each sound comes from where it happens on the screen (left or right speaker)
+const VOICES = opt('voices', 1);   // the souls' own small sounds: a bing when they blink, a note when born, a whisper when dying (0 = off)
 const OFFLINE = opt('offline', 1) > 0;   // keep a copy of everything in the browser, so it starts without internet after the first time
 
 const structs = [];             // { ratio, GR, GA, NZ } per structure
@@ -832,24 +837,105 @@ function startBreath() {
     const g = ac.createGain(); g.gain.value = 0;
     const osc = ac.createOscillator(); osc.type = 'sine'; osc.frequency.value = 48;
     const og = ac.createGain(); og.gain.value = 0;
-    src.connect(lp); lp.connect(g); g.connect(ac.destination); osc.connect(og); og.connect(ac.destination);
+    // the room: an echo made here (noise that dies away over about 3 s, darker as it fades); the low tone stays dry
+    const v = { ac, noise: buf, verbIn: null };
+    if (REVERB > 0 && ac.createConvolver) {
+      const cv = ac.createConvolver(), hp = ac.createBiquadFilter();
+      cv.buffer = makeRoom(ac); hp.type = 'highpass'; hp.frequency.value = 140;   // no boom from the low sounds
+      v.verbIn = ac.createGain(); v.verbIn.gain.value = REVERB;
+      v.verbIn.connect(hp); hp.connect(cv); cv.connect(ac.destination);
+    }
+    src.connect(lp); lp.connect(g); osc.connect(og); og.connect(ac.destination);
+    const bp = spot(v, g, 0.3);   // the breath: where the eyes are
     // the hum: two soft tones a fifth apart, slightly detuned so they beat slowly, through a warm filter
     const h1 = ac.createOscillator(), h2 = ac.createOscillator(), hl = ac.createBiquadFilter(), hg = ac.createGain();
     h1.type = 'triangle'; h1.frequency.value = 98; h2.type = 'sine'; h2.frequency.value = 147.7;
     hl.type = 'lowpass'; hl.frequency.value = 420; hg.gain.value = 0;
-    h1.connect(hl); h2.connect(hl); hl.connect(hg); hg.connect(ac.destination);
+    h1.connect(hl); h2.connect(hl); hl.connect(hg);
+    const hp = spot(v, hg, 0.45);   // the hum: around you
     src.start(); osc.start(); h1.start(); h2.start();
-    voice = { ac, lp, g, og, osc, hg, phase: 0, gaspUntil: 0 };
+    voice = Object.assign(v, { lp, g, og, osc, hg, bp, hp, phase: 0, gaspUntil: 0 });
   } catch (e) { console.warn('no sound:', e); }
 }
-// frightened: one sharp breath in, then a shaky breath out
-function gasp(k = 1) {
+// a large dark room's echo: noise that dies away (about 3 s), bright at first and darker as it fades, a little
+// different in each ear. forEach, not a for loop: the p5 editor's loop protection
+function makeRoom(ac) {
+  const sr = ac.sampleRate, ir = ac.createBuffer(2, floor(sr * 3.2), sr);
+  [0, 1].forEach((ch) => {
+    const d = ir.getChannelData(ch);
+    let lo = 0;
+    d.forEach((_, i) => {
+      const t = i / sr, a = 0.85 * Math.exp(-t * 2.5) + 0.04;   // how bright: less and less
+      lo += a * (Math.random() * 2 - 1 - lo);
+      d[i] = t < 0.02 ? 0 : lo * Math.exp(-t * 2.2);            // a moment of silence, then the room answers
+    });
+  });
+  return ir;
+}
+// a place for a sound: left or right (stereo), and how much of it reaches the room's echo
+function spot(v, node, wet, x) {
+  const p = v.ac.createStereoPanner ? v.ac.createStereoPanner() : v.ac.createGain();
+  node.connect(p); p.connect(v.ac.destination);
+  if (p.pan && x !== undefined) p.pan.value = panAt(x);
+  if (v.verbIn && wet > 0) { const s = v.ac.createGain(); s.gain.value = wet; p.connect(s); s.connect(v.verbIn); }
+  return p;
+}
+const panAt = (x) => (STEREO ? constrain(x / width * 2 - 1, -1, 1) * 0.85 : 0);   // screen left = left speaker
+function panTo(p, x, now, slow) { if (p && p.pan) p.pan.setTargetAtTime(panAt(x), now, slow); }
+
+// frightened: one sharp breath in, then a shaky breath out, from where the fright came
+function gasp(k = 1, x) {
   if (!GASP || !voice || voice.ac.state !== 'running') return;
   const t = voice.ac.currentTime, g = voice.g.gain, f = voice.lp.frequency;
   g.cancelScheduledValues(t); f.cancelScheduledValues(t);
   g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(0.42 * k, t + 0.07); g.setTargetAtTime(0.04, t + 0.12, 0.22);
   f.setValueAtTime(f.value, t); f.linearRampToValueAtTime(2600, t + 0.06); f.setTargetAtTime(380, t + 0.12, 0.25);
+  if (x !== undefined && voice.bp.pan) { voice.bp.pan.cancelScheduledValues(t); voice.bp.pan.setTargetAtTime(panAt(x), t, 0.02); }
   voice.gaspUntil = t + 0.9; voice.phase = 0.6;   // the breathing then goes on from a breath out
+}
+
+// ---------- voices of the souls ----------
+// Each eye has small sounds of its own: a soft bing in its note when it blinks open-eyed (louder near you), a faint note
+// when it is born, and a whisper with its note sinking away when it dies. Bigger eyes have lower notes (G minor
+// pentatonic, above the hum's G and D). Blinks are rationed, so many eyes never clatter.
+const NOTES = [392, 466.2, 523.3, 587.3, 698.5, 784];
+const soulNote = (e) => NOTES[constrain(floor((1.25 - e.sc) / 0.6 * NOTES.length), 0, NOTES.length - 1)];
+let clicks = 3;
+function soulSound(kind, e) {
+  const v = voice;
+  if (VOICES <= 0 || !v || v.ac.state !== 'running') return;
+  const ac = v.ac, t = ac.currentTime;
+  if (kind === 'blink') {
+    if (clicks < 1 || e.sleep > 0.5 || e.vis < 0.5 || e.alpha < 0.5) return;
+    clicks--;
+    // a soft, clear "bing" in its own note, an octave up: a gentle start (no knock) and a ringing fade into the room
+    const f0 = soulNote(e) * 2, o1 = ac.createOscillator(), o2 = ac.createOscillator(), g2 = ac.createGain(), g = ac.createGain(), at = t + (e.blinkDur || e.ty.dur) * 0.3;   // when the lids meet
+    o1.frequency.value = f0; o2.frequency.value = f0 * 2.002; g2.gain.value = 0.12;
+    o1.connect(g); o2.connect(g2); g2.connect(g);
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(VOICES * (0.025 + 0.045 * e.gath), at + 0.006); g.gain.setTargetAtTime(0, at + 0.01, 0.16);
+    spot(v, g, 0.5, e.x);
+    o1.start(at); o2.start(at); o1.stop(at + 1.4); o2.stop(at + 1.4);
+  } else if (kind === 'born') {   // its note, a glassy tone that swells and fades as it appears
+    const f0 = soulNote(e), o1 = ac.createOscillator(), o2 = ac.createOscillator(), g2 = ac.createGain(), g = ac.createGain();
+    o1.frequency.value = f0; o2.frequency.value = f0 * 2.003; g2.gain.value = 0.2;
+    o1.connect(g); o2.connect(g2); g2.connect(g);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(VOICES * 0.022, t + 1.2); g.gain.setTargetAtTime(0, t + 1.4, 1.1);
+    spot(v, g, 0.9, e.x);
+    o1.start(t); o2.start(t); o1.stop(t + 7); o2.stop(t + 7);
+  } else if (kind === 'die') {    // a whisper: breathy noise in a narrow band sinking from high to low, in soft pulses
+    const src = ac.createBufferSource(), f = ac.createBiquadFilter(), am = ac.createGain(), lfo = ac.createOscillator(), depth = ac.createGain(), g = ac.createGain();
+    src.buffer = v.noise; src.loop = true; f.type = 'bandpass'; f.Q.value = 5;
+    f.frequency.setValueAtTime(2200, t); f.frequency.exponentialRampToValueAtTime(450, t + 3.2);
+    lfo.frequency.value = 3.2; depth.gain.value = 0.5; am.gain.value = 0.5; lfo.connect(depth); depth.connect(am.gain);
+    src.connect(f); f.connect(am); am.connect(g);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(VOICES * 0.16, t + 0.5); g.gain.setTargetAtTime(0, t + 1.2, 0.8);
+    spot(v, g, 0.7, e.x);
+    const o = ac.createOscillator(), og = ac.createGain(), f0 = soulNote(e);   // and its note, sinking a little and fading
+    o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * 0.89, t + 4);
+    og.gain.setValueAtTime(0, t); og.gain.linearRampToValueAtTime(VOICES * 0.02, t + 0.6); og.gain.setTargetAtTime(0, t + 1, 1.2);
+    o.connect(og); spot(v, og, 0.9, e.x);
+    src.start(t); lfo.start(t); o.start(t); src.stop(t + 6); lfo.stop(t + 6); o.stop(t + 6);
+  }
 }
 // a soul passing near the others: they notice
 let mournAt = -1e9;
@@ -868,7 +954,11 @@ function breathe(dt) {
   const now0 = voice.ac.currentTime;
   // the hum: while it is gathered round you (grown), swelling a little with each breath; gone when it sleeps or is afraid
   if (HUM) voice.hg.gain.setTargetAtTime(STORY && companion && faces.length ? 0.035 * grow * (1 - 0.8 * rest) * (0.7 + 0.3 * sin(TWO_PI * voice.phase)) : 0, now0, 0.5);
+  const you = faces[0];
+  panTo(voice.hp, you ? lerp(width / 2, you.x, 0.6) : width / 2, now0, 0.6);   // the hum is round you
+  clicks = min(3, clicks + dt * 2.5);   // about two blink sounds a second at most
   if (now0 < voice.gaspUntil) return;   // a gasp is playing
+  panTo(voice.bp, you ? lerp(width / 2, you.x, 0.5) : width / 2, now0, 1.2);   // its breath: where it is gathered
   let awake = 0, watching = 0, near = 0, moving = 0;
   eyes.forEach((e) => {
     awake += 1 - e.sleep; if (e.face >= 0 && e.sleep < 0.5) watching++;
@@ -1018,7 +1108,7 @@ function quietGaze(e, t) {
 
 // eyelids: an almond opening that follows the vertical gaze and closes in blinks (fast down, slower up)
 function lids(e, rb, t) {
-  if (e.blinkStart < 0 && t >= e.blinkAt) e.blinkStart = t;
+  if (e.blinkStart < 0 && t >= e.blinkAt) { e.blinkStart = t; soulSound('blink', e); }
   let c = 0;
   if (e.blinkStart >= 0) {
     const u = (t - e.blinkStart) / (e.blinkDur || e.ty.dur);
@@ -1457,7 +1547,7 @@ function lifeStep(dt) {
     // a little slower, so now and then a soul passes quietly at the edge of your circle
     const held = faces.length && (e.watch || faces.some((p) => sq(e.x - p.x) + sq(e.y - p.y) < sq(cell * 1.6 * (1 + GROW * grow * 0.6))));
     e.age += dt * (held ? 0.2 : e.gath > 0.2 ? 0.6 : 1);
-    if (!e.dying && e.age > e.life && !held && shock < 0.1) { e.dying = 0.001; mourn(e); }   // never in the middle of a moment with you
+    if (!e.dying && e.age > e.life && !held && shock < 0.1) { e.dying = 0.001; mourn(e); soulSound('die', e); }   // never in the middle of a moment with you
     if (!e.dying) return;
     e.dying += dt / DIE_S;
     // it closes for the last time, shrinks and rises slowly into the dark
@@ -1487,7 +1577,7 @@ function reborn(e) {
   e.sleep = 1; e.wakeAt = 1e12; e.ready = false;
   drawOrder = eyes.slice().sort((a, b) => a.s - b.s);
   range(4).forEach((k) => jobs.push(() => colourise(e, k * R / 4, (k + 1) * R / 4)));   // a quarter of its colours a frame: no hitch
-  jobs.push(() => { renderEye(e, millis() / 1000); e.ready = true; e.wakeAt = millis() + random(800, 2000); });   // it opens slowly, after it appears
+  jobs.push(() => { renderEye(e, millis() / 1000); e.ready = true; e.wakeAt = millis() + random(800, 2000); soulSound('born', e); });   // it opens slowly, after it appears
 }
 
 // ---------- the beast's trust ----------
@@ -1514,13 +1604,13 @@ function fright(d, why, sound) {
       if (random() < 0.35) e.goneUntil = now + random(700, 2000);             // a few slip into the dark for a moment
     });
     grow = max(0, grow - 0.5); rest = 0; restFor = 0;                         // it shrinks back, and wakes if it slept
-    gasp(0.6);
+    gasp(0.6, startle.x);
     return;
   }
   frightAt = now; say.lastFright = now; say.frightSound = !!sound; addTrust(-d, why);
   if (faces.length) mood = min(1, mood + 0.06);   // every fright someone gives it stays with it a while
-  gasp();
   const p = faces[0];
+  gasp(1, sound ? startle.x : p ? p.x : width / 2);
   if (!sound) { startle.at = now / 1000; startle.x = p ? p.x : width / 2; startle.y = p ? p.y : height / 2; }
   eyes.forEach((e) => {
     e.hide = now + random(1200, 3500);
