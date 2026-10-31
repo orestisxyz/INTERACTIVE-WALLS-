@@ -18,7 +18,8 @@
 // bing when it blinks, its note when it is born, a whisper when it dies (`voices`); all its sounds ring in a large
 // dark room (`reverb`) and come from where they happen (`stereo`); a fright makes it gasp (`gasp`);
 // the day's mood (frights make it shyer for the next visitors, friends make it bolder); a narrator line at the
-// bottom says what is happening and what to do (`words`, `lang=el` for Greek).
+// bottom says what is happening and what to do (`words`) in Greek, English, Hungarian or Spanish (`lang`, and a
+// switch in the top-right corner).
 //
 // How it is drawn: an iris structure is painted once into an unwrapped strip and each eye recolours it with its
 // own natural palette (measured from reference photos). Each eye's iris image is re-rendered a few times a
@@ -27,11 +28,11 @@
 // the p5 web editor (loop protection), with p5.js 1.x and 2.x.
 //
 // Keys: F fullscreen, S save a still, R new colours, V start/stop a video, D what the camera sees (faces, trust,
-//   fps, mood), C calibrate for a wall (stand in the middle, then each side).
+//   fps, mood), C calibrate for a wall (stand in the middle, then each side), L the narrator's language.
 // Installation: kiosk/start_iris.bat and kiosk/SETUP_WINDOWS.md. sw.js keeps a copy of everything in the
 //   browser, so it starts without internet after the first time.
 // URL settings (all optional), story: calm=16 lose=3 hush=3 shy=1 snap=1.4 tempo=0.6 grow=0.8 trust=0 pact=1
-//   accept=8 hold=6 remember=30 mood=1 rest=60 gasp=1 hum=1 mourn=1 words=1 lang=en
+//   accept=8 hold=6 remember=30 mood=1 rest=60 gasp=1 hum=1 mourn=1 words=1 lang=el (el|en|hu|es)
 // eyes: most=24 eyes=N (fixed) minsize=100 size=260 space=1.7 life=60-360 seed=N layout=scatter|grid
 // look: turn=45 tilt=25 follow=0.55 parallel=0.8 gain=1.6 dist=0.45 ripple=0.15 around=1
 // room: sound=1 rhythm=1 motion=0 blink=0 breath=1 reverb=1 stereo=1 voices=1 quiet=1 sleep=20 gpu=0
@@ -709,6 +710,7 @@ function drawFrame() {
   });
   if (vig && recorder) drawingContext.drawImage(vig.elt, 0, 0, width, height);   // videos include the vignette
   narrate(min(0.1, deltaTime / 1000));   // over the eyes, so it can be read
+  langSwitch();
   if (showCam) camView();
   else if (camStatus()) { noStroke(); fill(222, 214, 204, 60); textSize(12); textAlign(LEFT, BASELINE); text(camStatus(), 12, height - 12); }   // quietly, for whoever looks after it
   runCalib();
@@ -838,14 +840,18 @@ function startBreath() {
     const osc = ac.createOscillator(); osc.type = 'sine'; osc.frequency.value = 48;
     const og = ac.createGain(); og.gain.value = 0;
     // the room: an echo made here (noise that dies away over about 3 s, darker as it fades); the low tone stays dry
-    const v = { ac, noise: buf, verbIn: null };
+    // everything it plays goes through one bus to the speakers; its "ear" on that bus knows what it is saying,
+    // so the microphone can leave it out (ownHeard), and a video can record it
+    const v = { ac, noise: buf, verbIn: null, master: ac.createGain(), ear: ac.createAnalyser() };
+    v.ear.fftSize = 512; v.earBuf = new Float32Array(512);
+    v.master.connect(v.ear); v.ear.connect(ac.destination);
     if (REVERB > 0 && ac.createConvolver) {
       const cv = ac.createConvolver(), hp = ac.createBiquadFilter();
       cv.buffer = makeRoom(ac); hp.type = 'highpass'; hp.frequency.value = 140;   // no boom from the low sounds
       v.verbIn = ac.createGain(); v.verbIn.gain.value = REVERB;
-      v.verbIn.connect(hp); hp.connect(cv); cv.connect(ac.destination);
+      v.verbIn.connect(hp); hp.connect(cv); cv.connect(v.master);
     }
-    src.connect(lp); lp.connect(g); osc.connect(og); og.connect(ac.destination);
+    src.connect(lp); lp.connect(g); osc.connect(og); og.connect(v.master);
     const bp = spot(v, g, 0.3);   // the breath: where the eyes are
     // the hum: two soft tones a fifth apart, slightly detuned so they beat slowly, through a warm filter
     const h1 = ac.createOscillator(), h2 = ac.createOscillator(), hl = ac.createBiquadFilter(), hg = ac.createGain();
@@ -875,7 +881,7 @@ function makeRoom(ac) {
 // a place for a sound: left or right (stereo), and how much of it reaches the room's echo
 function spot(v, node, wet, x) {
   const p = v.ac.createStereoPanner ? v.ac.createStereoPanner() : v.ac.createGain();
-  node.connect(p); p.connect(v.ac.destination);
+  node.connect(p); p.connect(v.master);
   if (p.pan && x !== undefined) p.pan.value = panAt(x);
   if (v.verbIn && wet > 0) { const s = v.ac.createGain(); s.gain.value = wet; p.connect(s); s.connect(v.verbIn); }
   return p;
@@ -1344,17 +1350,39 @@ function listen() {
   mic.an.getFloatTimeDomainData(mic.buf);
   let s = 0;
   mic.buf.forEach((v) => { s += v * v; });
-  const rms = sqrt(s / 512);
+  const rms = ownLeftOut(s / 512);   // what it hears, without its own voice
   // any sound above the room's own hum: the eyes hear something (0..1), and it fades over a few seconds
   const now = max(0, min(1, (rms / max(0.003, mic.base) - 1.8) / 5));
   heard = max(heard, now);
   // a sudden sound: much louder than a moment ago, and well above the room
-  if (RHYTHM && rms > mic.recent * 1.8 && rms > max(0.01, mic.base * 2.5) && millis() - mic.hitAt > 150) { mic.hitAt = millis(); onBeat(); }
+  if (RHYTHM && rms > mic.recent * 1.8 && rms > max(0.01, mic.base * 2.5) && millis() - mic.hitAt > 150) { mic.hitAt = millis(); own.skip = millis() + 1500; onBeat(); }
   mic.recent = lerp(mic.recent, rms, 0.3);
   if (rms > max(0.035, mic.base * SOUND_LEVEL)) {   // loud: look out at whoever is there, or straight ahead
     const f = faces[0];
+    own.skip = millis() + 3000;
     startleAt(f ? f.x : width / 2, f ? f.y : height / 2);
   } else mic.base = lerp(mic.base, rms, now > 0 ? 0.002 : 0.02);   // a voice or steps don't become the new quiet
+}
+
+// Not hearing itself. Its breath, gasps and bings come out of the speakers and could reach the microphone (echo
+// cancellation usually removes them, but not on every machine). So it learns how much of its own sound reaches
+// the microphone: over the last half minute, how far the microphone's loudness rises with what it is playing
+// (a room's own sounds don't rise and fall with its voice, so they don't count). That part is taken away before
+// it listens. If none of its sound reaches the microphone, it learns 0 and nothing changes. Not learned while it
+// is reacting to a sound (it breathes harder then, which would look like hearing itself).
+const own = { hist: [], mx: 0, my: 0, cxy: 0, vxx: 0, k: 0, skip: 0 };
+function ownLeftOut(micPow) {
+  let p = 0;
+  if (voice && voice.ear && voice.ac.state === 'running') { voice.ear.getFloatTimeDomainData(voice.earBuf); voice.earBuf.forEach((x) => { p += x * x; }); p /= 512; }
+  own.hist.push(p); if (own.hist.length > 15) own.hist.shift();   // the last quarter second: the way to the microphone takes a moment
+  const x = Math.max(...own.hist);
+  if (millis() > own.skip && shock < 0.05) {
+    const a = min(1, deltaTime / 30000);
+    own.mx += a * (x - own.mx); own.my += a * (micPow - own.my);
+    own.cxy += a * ((x - own.mx) * (micPow - own.my) - own.cxy); own.vxx += a * (sq(x - own.mx) - own.vxx);
+    own.k = own.vxx > 1e-12 ? constrain(own.cxy / own.vxx, 0, 50) : 0;
+  }
+  return sqrt(max(micPow * 0.1, micPow - own.k * x));   // never more than 90% taken away
 }
 
 // camera position (0..1) to screen: mirrored (you on the right of the camera = right of the screen), widened by GAIN.
@@ -1614,7 +1642,7 @@ function fright(d, why, sound) {
   if (!sound) { startle.at = now / 1000; startle.x = p ? p.x : width / 2; startle.y = p ? p.y : height / 2; }
   eyes.forEach((e) => {
     e.hide = now + random(1200, 3500);
-    if (sound) e.goneUntil = now + 1800 + 3500 * e.brave + random(0, 600);   // too loud: every eye vanishes; the bravest come back first
+    e.goneUntil = now + 1800 + 3500 * e.brave + random(0, 600);   // too loud or too fast: every eye vanishes; the bravest come back first
   });
 }
 function storyStep(dt) {
@@ -1810,23 +1838,28 @@ document.addEventListener('visibilitychange', keepAwake);
 
 // ---------- the narrator (words=1) ----------
 // Short lines at the bottom of the screen that tell the story and, at the same time, what to do next: each one
-// once per visitor, at the moment it matters, faded in and out, one at a time. lang=el for Greek; words=0: none.
+// once per visitor, at the moment it matters, faded in and out, one at a time. In Greek, English, Hungarian and
+// Spanish: lang=el|en|hu|es chooses the first one, and visitors can change it with the faint ΕΛ EN HU ES in the top-right corner
+// (or the L key). words=0: none.
 // If someone is stuck (moving or talking for a while and trust isn't growing), the advice comes back.
-const WORDS = opt('words', 1) > 0, LANG = Q.get('lang') === 'el' ? 'el' : 'en';
-const SAYINGS = {
-  arrive: ['Something in the dark is watching you.', 'Κάτι στο σκοτάδι σε κοιτάζει.'],
-  afraid: ['It is afraid. Stand still.', 'Φοβάται. Μην κουνιέσαι.'],
-  noise: ['Shh. It is listening.', 'Σσσ. Ακούει.'],
-  fright: ['Too fast. It hides.', 'Πολύ απότομα. Κρύβεται.'],
-  loud: ['Too loud. It hides.', 'Πολύ δυνατά. Κρύβεται.'],
-  startled: ['It startles, but stays with you.', 'Τρομάζει, αλλά μένει μαζί σου.'],
-  used: ['It is getting used to you.', 'Αρχίζει να σε συνηθίζει.'],
-  closer: ['Closer now. Don\'t move.', 'Πιο κοντά τώρα. Μην κουνιέσαι.'],
-  trusts: ['It trusts you. Walk, and it follows.', 'Σε εμπιστεύεται. Περπάτα, και θα σε ακολουθήσει.'],
-  grown: ['Stay, and it gathers its strength around you.', 'Μείνε, και μαζεύει τη δύναμή του γύρω σου.'],
-  guard: ['Someone else is here. It guards you.', 'Κάποιος άλλος είναι εδώ. Σε προστατεύει.'],
-  back: ['It remembers you.', 'Σε θυμάται.'],
-  sleeps: ['It sleeps beside you. Move gently.', 'Κοιμάται δίπλα σου. Κινήσου απαλά.'],
+const WORDS = opt('words', 1) > 0;
+const LANGS = ['en', 'el', 'hu', 'es'], LANG_NAMES = ['EN', 'ΕΛ', 'HU', 'ES'], LANG_ORDER = [1, 0, 2, 3];   // the order of the words in each line; the switch shows ΕΛ EN HU ES
+const LANG0 = LANGS.includes(Q.get('lang')) ? LANGS.indexOf(Q.get('lang')) : 1;   // Greek unless lang= says otherwise
+let lang = LANG0, langBox = [], langSeen = 0;
+const SAYINGS = {   // [English, Greek, Hungarian, Spanish]
+  arrive: ['Something in the dark is watching you.', 'Κάτι στο σκοτάδι σε κοιτάζει.', 'Valami a sötétben figyel téged.', 'Algo en la oscuridad te está mirando.'],
+  afraid: ['It is afraid. Stand still.', 'Φοβάται. Μην κουνιέσαι.', 'Fél. Ne mozdulj.', 'Tiene miedo. No te muevas.'],
+  noise: ['Shh. It is listening.', 'Σσσ. Ακούει.', 'Pszt. Fülel.', 'Shh. Está escuchando.'],
+  fright: ['Too fast. It hides.', 'Πολύ απότομα. Κρύβεται.', 'Túl gyors. Elbújik.', 'Demasiado rápido. Se esconde.'],
+  loud: ['Too loud. It hides.', 'Πολύ δυνατά. Κρύβεται.', 'Túl hangos. Elbújik.', 'Demasiado fuerte. Se esconde.'],
+  startled: ['It startles, but stays with you.', 'Τρομάζει, αλλά μένει μαζί σου.', 'Megriad, de veled marad.', 'Se asusta, pero se queda contigo.'],
+  used: ['It is getting used to you.', 'Αρχίζει να σε συνηθίζει.', 'Kezd megszokni téged.', 'Se está acostumbrando a ti.'],
+  closer: ['Closer now. Don\'t move.', 'Πιο κοντά τώρα. Μην κουνιέσαι.', 'Közelebb jön. Ne mozdulj.', 'Más cerca ahora. No te muevas.'],
+  trusts: ['It trusts you. Walk, and it follows.', 'Σε εμπιστεύεται. Περπάτα, και θα σε ακολουθήσει.', 'Megbízik benned. Indulj el, és követni fog.', 'Confía en ti. Camina y te seguirá.'],
+  grown: ['Stay, and it gathers its strength around you.', 'Μείνε, και μαζεύει τη δύναμή του γύρω σου.', 'Maradj, és köréd gyűjti az erejét.', 'Quédate y reunirá su fuerza a tu alrededor.'],
+  guard: ['Someone else is here. It guards you.', 'Κάποιος άλλος είναι εδώ. Σε προστατεύει.', 'Valaki más is itt van. Vigyáz rád.', 'Hay alguien más aquí. Te protege.'],
+  back: ['It remembers you.', 'Σε θυμάται.', 'Emlékszik rád.', 'Te recuerda.'],
+  sleeps: ['It sleeps beside you. Move gently.', 'Κοιμάται δίπλα σου. Κινήσου απαλά.', 'Melletted alszik. Mozdulj óvatosan.', 'Duerme a tu lado. Muévete con cuidado.'],
 };
 const say = { said: new Set(), queue: [], now: null, at: 0, who: null, stuckSince: 0, trustAgo: 0, trustAt: 0, lastFright: 0, greeted: false };
 function tell(what, again) {
@@ -1837,7 +1870,7 @@ function narrate(dt) {
   if (!WORDS || !STORY) return;
   if (mic && mic.ac.state !== 'running') {   // the browser keeps the microphone off until a click: say so, faintly (a kiosk started with start_iris.bat never needs it)
     const c = drawingContext; c.save(); c.font = '14px Georgia, serif'; c.textAlign = 'center'; c.fillStyle = 'rgba(222,214,204,0.35)';
-    c.fillText(LANG === 'el' ? 'Ένα κλικ, για να σε ακούει' : 'Click once, so it can hear you', width / 2, 24); c.restore();
+    c.fillText(['Click once, so it can hear you', 'Ένα κλικ, για να σε ακούει', 'Kattints egyszer, hogy hallhasson.', 'Haz clic una vez para que pueda oírte.'][lang], width / 2, 24); c.restore();
   }
   const now = millis(), p = friend && faces.includes(friend) ? friend : null;
   if (p !== say.who && p) { say.said = new Set(); say.queue = []; say.who = p; say.stuckSince = now; }   // a new visitor: the story from the start
@@ -1865,7 +1898,7 @@ function narrate(dt) {
   const stale = { sleeps: rest < 0.3, afraid: companion || (trust > 0.45 && !(friend && friend.moving > 0.3)), noise: companion || (trust > 0.6 && heard < 0.3), used: trust > 0.75 || companion, closer: companion };
   while (!say.now && say.queue.length) { const k = say.queue.shift(); if (!stale[k]) { say.now = k; say.at = now; } }
   if (!say.now) return;
-  const t = (now - say.at) / 1000, words = SAYINGS[say.now][LANG === 'el' ? 1 : 0], hold = 1.8 + words.length * 0.04;
+  const t = (now - say.at) / 1000, words = SAYINGS[say.now][lang], hold = 1.8 + words.length * 0.04;
   if (t > hold + 1.6) { say.now = null; return; }
   const a = 0.62 * min(sstep(0, 0.8, t), 1 - sstep(hold + 0.8, hold + 1.6, t));
   const ctx = drawingContext, size = round(constrain(min(width, height) * 0.032, 15, 40));
@@ -1876,6 +1909,33 @@ function narrate(dt) {
   ctx.fillStyle = 'rgba(222,214,204,' + a.toFixed(3) + ')';
   ctx.fillText(words, width / 2, height - max(size * 1.6, height * 0.06));
   ctx.restore();
+}
+
+// the language switch: faint letters in the top-right corner, the one in use brighter. A click or tap on one
+// changes the narrator's language (the L key steps through them). In an installation (kiosk=1) it goes back to
+// the first language after a minute with nobody there, ready for the next visitor. Not drawn in videos.
+function langSwitch() {
+  langBox = [];
+  if (!WORDS || !STORY) return;
+  if (faces.length) langSeen = millis();
+  else if (KIOSK && lang !== LANG0 && millis() - langSeen > 60000) lang = LANG0;
+  if (recorder) return;
+  const ctx = drawingContext, size = round(constrain(min(width, height) * 0.022, 13, 24)), gap = size * 1.1, y = size * 1.5;
+  ctx.save(); ctx.font = size + 'px Georgia, serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  let x = width - size;
+  LANG_ORDER.slice().reverse().forEach((i) => {
+    const w = ctx.measureText(LANG_NAMES[i]).width;
+    x -= w;
+    ctx.fillStyle = 'rgba(222,214,204,' + (i === lang ? 0.55 : 0.2) + ')';
+    ctx.fillText(LANG_NAMES[i], x, y);
+    langBox.push({ i, x0: x - gap / 2, x1: x + w + gap / 2, y0: 0, y1: y + size });   // easy to hit with a finger
+    x -= gap;
+  });
+  ctx.restore();
+}
+function setLang(i) {
+  lang = i; langSeen = millis();
+  if (say.now) say.at = millis() - 800;   // the line being said shows again at once, in the new language
 }
 
 // ---------- exhibition controls ----------
@@ -1893,11 +1953,14 @@ function keyPressed() {
   if (k === 'v') toggleRecording();
   if (k === 'd') showCam = !showCam;
   if (k === 'c') startCalib();
+  if (k === 'l') setLang(LANG_ORDER[(LANG_ORDER.indexOf(lang) + 1) % LANG_ORDER.length]);   // the next language
 }
 // double-tap (phone) or double-click: show or hide the camera view, like the D key
 let lastTap = -1e9;
 function mousePressed() {
   armSound();
+  const hit = langBox.find((b) => mouseX >= b.x0 && mouseX <= b.x1 && mouseY >= b.y0 && mouseY <= b.y1);
+  if (hit) { setLang(hit.i); lastTap = -1e9; return; }   // a language, not half of a double-tap
   if (KIOSK) return;   // visitors can't open it by accident
   if (millis() - lastTap < 400) { showCam = !showCam; lastTap = -1e9; } else lastTap = millis();
 }
@@ -1916,10 +1979,14 @@ function recolour() {
 // record the canvas to a video file (WebM, or MP4 in Safari), saved when you press V again
 function toggleRecording() {
   if (recorder) { recorder.stop(); return; }
-  const type = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4'].find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+  const type = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
   if (!type) { console.warn('video recording is not supported in this browser'); return; }
-  const chunks = [];
-  recorder = new MediaRecorder(drawingContext.canvas.captureStream(30), { mimeType: type, videoBitsPerSecond: 8e6 });
+  const chunks = [], stream = drawingContext.canvas.captureStream(30);
+  if (voice && voice.master && voice.ac.createMediaStreamDestination) {   // with its sound (what it plays, not the microphone)
+    if (!voice.rec) { voice.rec = voice.ac.createMediaStreamDestination(); voice.master.connect(voice.rec); }
+    voice.rec.stream.getAudioTracks().forEach((tr) => stream.addTrack(tr));
+  }
+  recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8e6 });
   recorder.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
   recorder.onstop = () => {
     const a = document.createElement('a');

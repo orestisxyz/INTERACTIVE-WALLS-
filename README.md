@@ -10,9 +10,9 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 
 ## Iris
 
-**The story.** A narrator line at the bottom says what is happening and what to do (`lang=el` for Greek).
+**The story.** A narrator line at the bottom says what is happening and what to do, in Greek, English, Hungarian or Spanish: visitors choose with the faint ΕΛ EN HU ES in the top-right corner.
 
-1. **Afraid.** When you arrive the eyes run to the edges, look away and steal glances. Moving or talking makes it worse: until it trusts you, moving and noise take trust away three times faster than stillness builds it. A rush or a clap frightens it (a gasp, the eyes shut); a loud bang makes every eye vanish into the dark, and they come back slowly, the bravest first.
+1. **Afraid.** When you arrive the eyes run to the edges, look away and steal glances. Moving or talking makes it worse: until it trusts you, moving and noise take trust away three times faster than stillness builds it. A clap startles it (the eyes shut); a rush or a loud bang frightens it: a gasp, every eye vanishes into the dark, and they come back slowly, the bravest first.
 2. **Trust.** Stand still and quiet. The bravest eyes come closer first. Full trust takes about 16 s of calm.
 3. **The pact.** At full trust every eye shuts, then they open wide, nearest first, with one deep breath.
 4. **Companion.** It follows you. Stop, and it gathers round you and grows, humming softly. If it hears something, it keeps watch for you; a loud bang still startles it a little, but it stays. Stay still for a minute and it falls asleep beside you, one eye now and then checking you are still there.
@@ -22,13 +22,13 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 **Around the story.** Each eye is a lost soul that lives a few minutes, fades, and is born again somewhere else; the eyes near it turn to watch it go. Each soul has a voice of its own: a soft bing in its own note when it blinks, that note when it is born, and a whisper when it dies. The beast also has a mood for the day: frights make it shyer for the next visitors, friends make it bolder, and it settles over about half an hour.
 
 - **Camera:** finds faces with MediaPipe on this device. No image leaves the browser, nothing is recorded or sent, and no face is recognised.
-- **Microphone:** listens to the room's loudness only (noise, claps, bangs).
+- **Microphone:** listens to the room's loudness only (noise, claps, bangs). It leaves its own sound out: it learns how much of what it plays reaches the microphone and takes that part away.
 - **Sound:** a breathing voice, the souls' small voices, all ringing in a large dark room (an echo made in code) and coming from where they happen on the screen (left or right speaker). Best on speakers or headphones: laptop speakers lose the low tones. In a normal browser it starts after the first click, tap or key; the kiosk start file needs no click.
-- **Keys:** F fullscreen, S save a still, R new colours, V record a video, D what the camera sees (faces, trust, fps, eye count, mood), C calibrate for a wall.
+- **Keys:** F fullscreen, S save a still, R new colours, V record a video (with its sound), D what the camera sees (faces, trust, fps, eye count, mood), C calibrate for a wall, L the narrator's language.
 - **Calibrate for a wall:** if the camera is off to one side or far from the screen, press C and follow the words (middle, one side, the other). It is saved in that browser. `?calib=0` forgets it.
 - **As many eyes as the device can hold**, up to 24 by default: it adds eyes while the animation stays smooth and removes some if it stutters, and remembers the number per screen.
 - **Works offline after the first start:** `sw.js` keeps a copy of p5, the face model and the sketch in the browser.
-- **Settings in the address**, for example `iris/?lang=el&calm=20`:
+- **Settings in the address**, for example `iris/?lang=en&calm=20`:
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -41,7 +41,7 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 | `gasp`, `hum`, `mourn` | 1, 1, 1 | the gasp on a fright; the hum round you; eyes watching a soul go (0 turns each off) |
 | `pact`, `mood`, `story` | 1, 1, 1 | the trust moment; the day's mood; 0 turns each off (`story=0`: it simply follows) |
 | `trust` | 0 | `trust=1` starts it tame |
-| `words`, `lang` | 1, en | narrator lines; `lang=el` for Greek |
+| `words`, `lang` | 1, el | narrator lines; the first language: `el` Greek, `en` English, `hu` Hungarian, `es` Spanish (with `kiosk=1` it returns to it after a minute with nobody there) |
 | `most`, `eyes`, `life` | 24, adaptive, 60-360 | most eyes; a fixed count; seconds each soul lives (`life=0` for ever) |
 | `sound`, `rhythm`, `breath` | 1, 1, 1 | microphone; claps and beats; the breathing voice |
 | `reverb`, `stereo`, `voices` | 1, 1, 1 | the room's echo (2 = twice as much); sounds from their side; the souls' voices (0.5 = half as loud). 0 turns each off |
