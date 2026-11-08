@@ -82,4 +82,4 @@ You look into a bathroom mirror after a hot shower: the glass is steamed and you
 
 The code is open: MIT licence (see [LICENSE](LICENSE)). Learn from it, take techniques, build your own things with it.
 
-The artworks are not: the works themselves (Iris as an artwork, its name, story, narrator texts, look and sound, and any exhibition of it) are © 2026 Orestis Dimopoulos (ORE.XYZ), all rights reserved. To show a work, get in touch through [orexyz.com](https://orexyz.com).
+The artworks are not: the works themselves (Iris and Rothko Mirror as artworks, their names, stories, narrator texts, look and sound, and any exhibition of them) are © 2026 Orestis Dimopoulos (ORE.XYZ), all rights reserved. To show a work, get in touch through [orexyz.com](https://orexyz.com).
