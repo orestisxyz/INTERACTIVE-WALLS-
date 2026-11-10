@@ -8,6 +8,7 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 |---|------|--------------|
 | 01 | [Iris](iris/) | A shy beast made of eyes in the dark. It runs from you at first; stand still and quiet and it learns to trust you, then follows you, guards you from strangers, and watches you go. |
 | 02 | [Rothko Mirror](rothko-mirror/) | A steamed bathroom mirror in the atmosphere of Rothko's paintings: you are a soft blur inside slowly shifting layers of blue, red or yellow. Step back and you dissolve into the colour. |
+| 03 | [Reeded Glass](reeded-glass/) | You, seen through fluted glass: a rust figure on pale glass, broken into vertical ribs. Each rib shows a different moment, you leave a stain that slowly runs down, and quick movement twists the ribs like louvres. |
 
 ## Iris
 
@@ -78,8 +79,22 @@ You look into a bathroom mirror after a hot shower: the glass is steamed and you
 - **Keys:** R colours, F fullscreen, S save a still, D what it measures (fps, face size, near, blur), H hide the hint, N / G / X on-site setup.
 - **Settings** are at the top of `rothko-mirror/sketch.js` (`SET`): blur, colours, layers, slow change, distance.
 
+## Reeded Glass
+
+You, seen through a pane of reeded (fluted) glass: a pale, quiet surface, and behind it a warm rust figure broken into vertical ribs and smeared up and down, never sharp.
+
+- **Finds you by itself:** a small body model (MediaPipe selfie segmenter, on this device) finds the person, so the room never needs to be empty. Its edge is softened, then smeared and cut by the ribs. If the model can't load, press B with nobody in view to learn the empty room instead.
+- **Time:** each rib shows you a little later than the one beside it, up to 2 s. Stand still and you are whole; move and you stagger across the glass.
+- **Stain:** where you have been, a lighter rust stays and slowly runs down the ribs, fading over about 30 s.
+- **Turn:** quick movement twists the ribs like louvres and shows their darker sides; when you are calm they settle back over about 3 s.
+- **Test pages:** `reeded-glass/` has all three together; `time.html`, `stain.html`, `turn.html`, `time-stain.html` and `base.html` (glass only) each show one part.
+- **Camera:** stays on the device. No image leaves the browser, nothing is recorded or sent. The body model downloads once on the first start (needs internet then).
+- **Keys:** R colours (rust, your colours, indigo), [ ] fewer or more ribs, T delay pattern, - and = shorter or longer delay, W wipe the stain, B learn the empty room, X forget it, F fullscreen, S save a still, D what it measures, H hide the hint.
+- **Phone:** tap = colours, double tap = front or back camera, hold 1 s = learn the empty room. Stand the phone still.
+- **Settings** are at the top of each sketch (`SET`): ribs, bend, smear, colours, delay, stain, turning, finder, render size.
+
 ## Licence
 
 The code is open: MIT licence (see [LICENSE](LICENSE)). Learn from it, take techniques, build your own things with it.
 
-The artworks are not: the works themselves (Iris and Rothko Mirror as artworks, their names, stories, narrator texts, look and sound, and any exhibition of them) are © 2026 Orestis Dimopoulos (ORE.XYZ), all rights reserved. To show a work, get in touch through [orexyz.com](https://orexyz.com).
+The artworks are not: the works themselves (Iris, Rothko Mirror and Reeded Glass as artworks, their names, stories, narrator texts, look and sound, and any exhibition of them) are © 2026 Orestis Dimopoulos (ORE.XYZ), all rights reserved. To show a work, get in touch through [orexyz.com](https://orexyz.com).
