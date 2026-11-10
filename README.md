@@ -7,6 +7,7 @@ Live: https://orestisxyz.github.io/INTERACTIVE-WALLS-/
 | # | Work | What it does |
 |---|------|--------------|
 | 01 | [Iris](iris/) | A shy beast made of eyes in the dark. It runs from you at first; stand still and quiet and it learns to trust you, then follows you, guards you from strangers, and watches you go. |
+| 02 | [Rothko Mirror](rothko-mirror/) | A steamed bathroom mirror in the atmosphere of Rothko's paintings: you are a soft blur inside slowly shifting layers of blue, red or yellow. Step back and you dissolve into the colour. |
 
 ## Iris
 
@@ -64,8 +65,21 @@ Then open http://localhost:8000/iris/ and allow the camera.
 
 Make a folder (`02-name/`) with its own `index.html`, then add a line to the list in `index.html` and to the table above.
 
+## Rothko Mirror
+
+You look into a bathroom mirror after a hot shower: the glass is steamed and you are only soft masses of colour, inside a painting made of thin layers, after the way Rothko built his canvases (a stain ground that shows through, veils of other tones, uneven glazes).
+
+- **Colour:** three colour sets, blue (default), red and yellow; tap, click or R to change. No black shadows and no white highlights: everything stays colour.
+- **Layers:** a ground, the field, six thin veils (some in the lights, some in the shadows), a soft glow where light meets dark and an uneven glaze, each drifting at its own slow speed.
+- **Slow change:** the painting changes by itself over about 2 minutes: warmer or cooler, the veils thicker or thinner, a little lighter or deeper.
+- **Distance:** near the glass you are a soft blur, never clear; step back and the blur grows until you melt into one colour and are no longer visible. No one there = only the painting. It guesses distance from the size of a face (MediaPipe face detector, on this device); past about 2 m it no longer finds faces.
+- **Set up on site:** stand where you want to be clearest and press N; stand where you want to vanish and press G. Saved in that browser; X forgets it.
+- **Camera:** stays on the device. No image leaves the browser, nothing is recorded or sent, no face is recognised (only its size is measured). The face model downloads once on the first start (needs internet then).
+- **Keys:** R colours, F fullscreen, S save a still, D what it measures (fps, face size, near, blur), H hide the hint, N / G / X on-site setup.
+- **Settings** are at the top of `rothko-mirror/sketch.js` (`SET`): blur, colours, layers, slow change, distance.
+
 ## Licence
 
 The code is open: MIT licence (see [LICENSE](LICENSE)). Learn from it, take techniques, build your own things with it.
 
-The artworks are not: the works themselves (Iris as an artwork, its name, story, narrator texts, look and sound, and any exhibition of it) are © 2026 Orestis Dimopoulos (ORE.XYZ), all rights reserved. To show a work, get in touch through [orexyz.com](https://orexyz.com).
+The artworks are not: the works themselves (Iris and Rothko Mirror as artworks, their names, stories, narrator texts, look and sound, and any exhibition of them) are © 2026 Orestis Dimopoulos (ORE.XYZ), all rights reserved. To show a work, get in touch through [orexyz.com](https://orexyz.com).
